@@ -1,0 +1,1022 @@
+---
+title: "03-Hand2+ DGE and Pathways"
+output: html_document
+date: "2025-06-18"
+---
+
+```{r setup, include=FALSE}
+library(Seurat)
+library(Matrix)
+library(SingleCellExperiment)
+library(tidyverse)
+library(scales)
+library(cowplot)
+library(dplyr)
+library(ggplot2)
+library(DoubletFinder)
+library(sctransform)
+library(ggraph)
+library(clustree)
+library(plotly)
+library(RCurl)
+library(harmony)
+library(biomaRt)
+library(AnnotationHub)
+library(ensembldb)
+library(shiny)
+library(scater)
+library(xlsx)
+library(DESeq2)
+library(ggrepel)
+library(ggpubr)
+library(brew)
+library(RColorBrewer)
+library(clusterProfiler)
+library(DOSE)
+library(pathview)
+library(org.Mm.eg.db)
+library(pheatmap)
+library(scran)
+library(enrichplot)
+options (future.globals.maxSize = 10000000000000000000000000000000)
+library(openxlsx)
+library(DOSE)
+library(pathview)
+library(org.Mm.eg.db)
+library(readxl)
+library(EnhancedVolcano)
+library(SCPA)
+library(msigdbr)
+library(tidyverse)
+library(magrittr)
+library(ComplexHeatmap)
+library(circlize)
+library(RColorBrewer)
+library(patchwork)
+```
+
+#Creating a Hand2+ stromal cell subset
+```{r}
+DefaultAssay(maternal_integrated) <- "RNA"
+maternal_stroma <- subset(x = maternal_integrated, idents = c("S1","S2","S3","S4"))
+
+DefaultAssay(maternal_integrated) <- "integrated"
+
+```
+
+
+
+#Recluster Hand2+ ESC subset for comparison
+
+```{r}
+
+DefaultAssay (maternal_stroma) <- "integrated"
+
+#redo find neighbours/clusters
+
+maternal_stroma <- FindNeighbors (maternal_stroma, dims = 1:30)
+maternal_stroma <- FindClusters  (maternal_stroma, resolution = 0.23, dims = 1:30)
+# Reduce decidual data dimensionality
+maternal_stroma <- RunUMAP       (maternal_stroma, reduction  = "pca", dims = 1:30)
+
+UMAPPlot     (object = maternal_stroma, label = TRUE, pt.size = 1)                      + NoLegend ()
+```
+
+#Table5: Markers for each cluster
+```{r}
+DefaultAssay(maternal_stroma) <- "RNA"
+maternal_stroma <- SetIdent(maternal_stroma, value = maternal_stroma@meta.data$seurat_clusters)
+maternal_stroma.seuratmarkers <- FindAllMarkers(maternal_stroma, only.pos = TRUE)
+
+DefaultAssay(maternal_stroma) <- "integrated"
+```
+
+
+
+
+#Asigning Hand2+ ESC types based on the markers
+```{r}
+maternal_stroma$strsubset <- NA
+maternal_stroma$strsubset[which(str_detect(maternal_stroma$seurat_clusters, "0"))] <- "udStr"
+maternal_stroma$strsubset[which(str_detect(maternal_stroma$seurat_clusters, "3"))] <- "PDZ1"
+maternal_stroma$strsubset[which(str_detect(maternal_stroma$seurat_clusters, "4"))] <- "PDZ2"
+maternal_stroma$strsubset[which(str_detect(maternal_stroma$seurat_clusters, "1"))] <- "SDZ1"
+maternal_stroma$strsubset[which(str_detect(maternal_stroma$seurat_clusters, "2"))] <- "SDZ2" 
+
+UMAPPlot     (object = maternal_stroma, label = TRUE, pt.size = 1, group.by = "strsubset")                      + NoLegend ()
+
+```
+
+#Figure3A - UMAP
+```{r}
+
+UMAPPlot     (object = maternal_stroma, label = F, pt.size = 3)  + NoLegend ()
+```
+
+
+
+#Figure3B, 3C and Table 6- DGE
+```{r}
+maternal_stroma$strsubset.cond <- paste(maternal_stroma$strsubset, maternal_stroma$Condition, sep = "_")
+Idents(maternal_stroma) <- "strsubset.cond"
+DefaultAssay(maternal_stroma) <- "RNA"
+
+```
+
+
+
+
+```{r}
+DefaultAssay(maternal_stroma) <- "RNA"
+Idents(maternal_stroma) <- "strsubset.cond"
+
+maternal_udstr.MAST <- FindMarkers(maternal_stroma, ident.1 = "udStr_Maternal HFHS", ident.2 = "udStr_Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+```
+
+
+
+```{r}
+DefaultAssay(maternal_stroma) <- "RNA"
+Idents(maternal_stroma) <- "strsubset.cond"
+
+maternal_PDZ1.MAST <- FindMarkers(maternal_stroma, ident.1 = "PDZ1_Maternal HFHS", ident.2 = "PDZ1_Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+```
+
+```{r}
+DefaultAssay(maternal_stroma) <- "RNA"
+Idents(maternal_stroma) <- "strsubset.cond"
+
+maternal_PDZ2.MAST <- FindMarkers(maternal_stroma, ident.1 = "PDZ2_Maternal HFHS", ident.2 = "PDZ2_Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+```
+
+```{r}
+DefaultAssay(maternal_stroma) <- "RNA"
+Idents(maternal_stroma) <- "strsubset.cond"
+
+maternal_SDZ1.MAST <- FindMarkers(maternal_stroma, ident.1 = "SDZ1_Maternal HFHS", ident.2 = "SDZ1_Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+```
+
+
+```{r}
+DefaultAssay(maternal_stroma) <- "RNA"
+Idents(maternal_stroma) <- "strsubset.cond"
+
+maternal_SDZ2.MAST <- FindMarkers(maternal_stroma, ident.1 = "SDZ2_Maternal HFHS", ident.2 = "SDZ2_Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+```
+
+#Figure3B
+
+```{r}
+# Create the data frame
+data <- data.frame(
+  CellType = c("udStr", "PDZ1", "PDZ2", "SDZ1", 
+               "SDZ2"),
+  Upregulated = c(594, 725, 162,867, 1036),
+  Downregulated = c(-125, -185,-60, -409, -545)
+)
+positions <- c("udStr", "PDZ1", "PDZ2","SDZ1","SDZ2")
+
+# Plot the data
+
+ggplot(data, aes(x = reorder(CellType, Upregulated), y = Downregulated, fill = "Decreased Expression")) +
+  geom_bar(stat = "identity", color = "black", fill = "dodgerblue2") +
+  geom_bar(aes(y = Upregulated, fill = "Increased Expression"), stat = "identity", color = "black", fill = "indianred") +
+  coord_flip() +
+  labs(
+    x = "Cell Types", 
+    y = "Number of Genes", 
+    fill = "Regulation", 
+    title = "Differential Gene Expression by Cell Type"
+  ) +
+  scale_fill_manual(values = c("Increased Expression" = "indianred", "Decreased Expression" = "dodgerblue2")) +
+  theme_minimal()+
+  theme(
+    panel.grid = element_blank()  # Removes grid lines
+  )+ scale_x_discrete(limits = rev(positions))
+
+```
+
+
+#Figure3D - ScatterPlots
+
+
+
+```{r}
+
+maternal_udstr.MAST$gene <- rownames(maternal_udstr.MAST)
+
+# Define thresholds
+logfc_threshold <- 0.4
+padj_threshold <- 0.05
+
+# Categorize genes
+maternal_udstr.MAST$group <- "None"
+maternal_udstr.MAST$group[maternal_udstr.MAST$avg_log2FC > logfc_threshold & maternal_udstr.MAST$p_val_adj < padj_threshold] <- "Up"
+maternal_udstr.MAST$group[maternal_udstr.MAST$avg_log2FC < -logfc_threshold & maternal_udstr.MAST$p_val_adj < padj_threshold] <- "Down"
+
+# Factor levels to control legend order
+maternal_udstr.MAST$group <- factor(maternal_udstr.MAST$group, levels = c("Up", "None", "Down"))
+
+# Counts for legend
+up_count_udstr <- sum(maternal_udstr.MAST$group == "Up")
+none_count_udstr <- sum(maternal_udstr.MAST$group == "None")
+down_count_udstr <- sum(maternal_udstr.MAST$group == "Down")
+```
+
+
+
+
+```{r}
+# Define the genes of interests
+highlight_genes_udstr <- c("C3", "Cxcl5", "Klf5","Klf15", "Plk2", "Scx","Spon1", "Sned1", "Myl9", "Hist1h4d")  
+
+# Filter for those genes
+genes_to_label_udstr <- maternal_udstr.MAST[rownames(maternal_udstr.MAST) %in% highlight_genes_udstr, ]
+
+
+genes_to_label_udstr$label_x <- genes_to_label_udstr$pct.1
+genes_to_label_udstr$label_y <- genes_to_label_udstr$pct.2
+```
+
+```{r}
+
+ggplot(maternal_udstr.MAST, aes(x = pct.1, y = pct.2, color = group)) +
+  geom_point(data = subset(maternal_udstr.MAST, group == "None"),
+             color = "grey", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_udstr.MAST, group == "Up"),
+             color = "indianred", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_udstr.MAST, group == "Down"),
+             color = "dodgerblue2", alpha = 1, size = 8) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "purple") +
+  
+  # Connector lines
+  geom_segment(data = genes_to_label_udstr,
+               aes(x = pct.1, y = pct.2, xend = label_x, yend = label_y),
+               inherit.aes = FALSE, color = "black", size = 0.3) +
+  
+  # Triangle markers
+  geom_point(data = genes_to_label_udstr,
+             aes(x = label_x, y = label_y),
+             shape = 17, size = 2, color = "black", inherit.aes = FALSE) +
+  
+  # Repelled labels
+  geom_text_repel(data = genes_to_label_udstr,
+                  aes(x = label_x, y = label_y, label = rownames(genes_to_label_udstr)),
+                  color = "black", size = 5,
+                  min.segment.length = 0, force = 2, max.overlaps = Inf) +
+
+  scale_color_manual(values = c("Up" = "indianred", "None" = "grey", "Down" = "dodgerblue2"),
+                     labels = c(paste0("Up = ", up_count_udstr),
+                                paste0("None = ", none_count_udstr),
+                                paste0("Down = ", down_count_udstr))) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = 16)) +
+  labs(x = "Detection in HFHS (%)",
+       y = "Detection in Chow (%)",
+       title = "udstr Cells – DGE Scatter with Selected Gene Labels")
+
+
+```
+
+
+
+
+
+```{r}
+
+maternal_pdz1.MAST$gene <- rownames(maternal_pdz1.MAST)
+
+# Define thresholds
+logfc_threshold <- 0.4
+padj_threshold <- 0.05
+
+# Categorize genes
+maternal_pdz1.MAST$group <- "None"
+maternal_pdz1.MAST$group[maternal_pdz1.MAST$avg_log2FC > logfc_threshold & maternal_pdz1.MAST$p_val_adj < padj_threshold] <- "Up"
+maternal_pdz1.MAST$group[maternal_pdz1.MAST$avg_log2FC < -logfc_threshold & maternal_pdz1.MAST$p_val_adj < padj_threshold] <- "Down"
+
+# Factor levels to control legend order
+maternal_pdz1.MAST$group <- factor(maternal_pdz1.MAST$group, levels = c("Up", "None", "Down"))
+
+# Counts for legend
+up_count_pdz1 <- sum(maternal_pdz1.MAST$group == "Up")
+none_count_pdz1 <- sum(maternal_pdz1.MAST$group == "None")
+down_count_pdz1 <- sum(maternal_pdz1.MAST$group == "Down")
+```
+
+
+
+```{r}
+# Define the genes of interests
+highlight_genes_pdz1 <- c( "Bmp2", "Gata3", "Gcat", "Kit","Unc13c","Hmgcs2", "Cfh", "Hist1h1e", "Hist1h4d")  
+
+# Filter for those genes
+genes_to_label_pdz1 <- maternal_pdz1.MAST[rownames(maternal_pdz1.MAST) %in% highlight_genes_pdz1, ]
+
+
+genes_to_label_pdz1$label_x <- genes_to_label_pdz1$pct.1
+genes_to_label_pdz1$label_y <- genes_to_label_pdz1$pct.2
+```
+
+```{r}
+
+ggplot(maternal_pdz1.MAST, aes(x = pct.1, y = pct.2, color = group)) +
+  geom_point(data = subset(maternal_pdz1.MAST, group == "None"),
+             color = "grey", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_pdz1.MAST, group == "Up"),
+             color = "indianred", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_pdz1.MAST, group == "Down"),
+             color = "dodgerblue2", alpha = 1, size = 8) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "purple") +
+  
+  # Connector lines
+  geom_segment(data = genes_to_label_pdz1,
+               aes(x = pct.1, y = pct.2, xend = label_x, yend = label_y),
+               inherit.aes = FALSE, color = "black", size = 0.3) +
+  
+  # Triangle markers
+  geom_point(data = genes_to_label_pdz1,
+             aes(x = label_x, y = label_y),
+             shape = 17, size = 2, color = "black", inherit.aes = FALSE) +
+  
+  # Repelled labels
+  geom_text_repel(data = genes_to_label_pdz1,
+                  aes(x = label_x, y = label_y, label = rownames(genes_to_label_pdz1)),
+                  color = "black", size = 5,
+                  min.segment.length = 0, force = 2, max.overlaps = Inf) +
+
+  scale_color_manual(values = c("Up" = "indianred", "None" = "grey", "Down" = "dodgerblue2"),
+                     labels = c(paste0("Up = ", up_count_pdz1),
+                                paste0("None = ", none_count_pdz1),
+                                paste0("Down = ", down_count_pdz1))) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = 16)) +
+  labs(x = "Detection in HFHS (%)",
+       y = "Detection in Chow (%)",
+       title = "pdz1 Cells – DGE Scatter with Selected Gene Labels")
+
+
+```
+
+
+
+
+
+```{r}
+
+maternal_pdz2.MAST$gene <- rownames(maternal_pdz2.MAST)
+
+# Define thresholds
+logfc_threshold <- 0.4
+padj_threshold <- 0.05
+
+# Categorize genes
+maternal_pdz2.MAST$group <- "None"
+maternal_pdz2.MAST$group[maternal_pdz2.MAST$avg_log2FC > logfc_threshold & maternal_pdz2.MAST$p_val_adj < padj_threshold] <- "Up"
+maternal_pdz2.MAST$group[maternal_pdz2.MAST$avg_log2FC < -logfc_threshold & maternal_pdz2.MAST$p_val_adj < padj_threshold] <- "Down"
+
+# Factor levels to control legend order
+maternal_pdz2.MAST$group <- factor(maternal_pdz2.MAST$group, levels = c("Up", "None", "Down"))
+
+# Counts for legend
+up_count_pdz2 <- sum(maternal_pdz2.MAST$group == "Up")
+none_count_pdz2 <- sum(maternal_pdz2.MAST$group == "None")
+down_count_pdz2 <- sum(maternal_pdz2.MAST$group == "Down")
+```
+
+
+
+
+```{r}
+# Define the genes of interests
+highlight_genes_pdz2 <- c("Fos", "Fosb", "Hist1h2ac", "Hist1h2ai", "Hist1h2bj", "Hist1h2bm", "Hist1h3e", "Hist1h3g", "Snai2", "Unc13c","Cfh")  
+
+# Filter for those genes
+genes_to_label_pdz2 <- maternal_pdz2.MAST[rownames(maternal_pdz2.MAST) %in% highlight_genes_pdz2, ]
+
+
+genes_to_label_pdz2$label_x <- genes_to_label_pdz2$pct.1
+genes_to_label_pdz2$label_y <- genes_to_label_pdz2$pct.2
+```
+
+```{r}
+
+ggplot(maternal_pdz2.MAST, aes(x = pct.1, y = pct.2, color = group)) +
+  geom_point(data = subset(maternal_pdz2.MAST, group == "None"),
+             color = "grey", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_pdz2.MAST, group == "Up"),
+             color = "indianred", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_pdz2.MAST, group == "Down"),
+             color = "dodgerblue2", alpha = 1, size = 8) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "purple") +
+  
+  # Connector lines
+  geom_segment(data = genes_to_label_pdz2,
+               aes(x = pct.1, y = pct.2, xend = label_x, yend = label_y),
+               inherit.aes = FALSE, color = "black", size = 0.3) +
+  
+  # Triangle markers
+  geom_point(data = genes_to_label_pdz2,
+             aes(x = label_x, y = label_y),
+             shape = 17, size = 2, color = "black", inherit.aes = FALSE) +
+  
+  # Repelled labels
+  geom_text_repel(data = genes_to_label_pdz2,
+                  aes(x = label_x, y = label_y, label = rownames(genes_to_label_pdz2)),
+                  color = "black", size = 5,
+                  min.segment.length = 0, force = 2, max.overlaps = Inf) +
+
+  scale_color_manual(values = c("Up" = "indianred", "None" = "grey", "Down" = "dodgerblue2"),
+                     labels = c(paste0("Up = ", up_count_pdz2),
+                                paste0("None = ", none_count_pdz2),
+                                paste0("Down = ", down_count_pdz2))) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = 16)) +
+  labs(x = "Detection in HFHS (%)",
+       y = "Detection in Chow (%)",
+       title = "pdz2 Cells – DGE Scatter with Selected Gene Labels")
+
+
+```
+
+
+
+
+```{r}
+
+maternal_sdz1.MAST$gene <- rownames(maternal_sdz1.MAST)
+
+# Define thresholds
+logfc_threshold <- 0.4
+padj_threshold <- 0.05
+
+# Categorize genes
+maternal_sdz1.MAST$group <- "None"
+maternal_sdz1.MAST$group[maternal_sdz1.MAST$avg_log2FC > logfc_threshold & maternal_sdz1.MAST$p_val_adj < padj_threshold] <- "Up"
+maternal_sdz1.MAST$group[maternal_sdz1.MAST$avg_log2FC < -logfc_threshold & maternal_sdz1.MAST$p_val_adj < padj_threshold] <- "Down"
+
+# Factor levels to control legend order
+maternal_sdz1.MAST$group <- factor(maternal_sdz1.MAST$group, levels = c("Up", "None", "Down"))
+
+# Counts for legend
+up_count_sdz1 <- sum(maternal_sdz1.MAST$group == "Up")
+none_count_sdz1 <- sum(maternal_sdz1.MAST$group == "None")
+down_count_sdz1 <- sum(maternal_sdz1.MAST$group == "Down")
+```
+
+
+
+```{r}
+# Define the genes of interests
+highlight_genes_sdz1 <- c("Adamts5", "Cdh13", "Prlr", "Slc6a2", "Socs2", "Thy1","Chodl", "Tsc22d3","Dctpp1", "Fkbp11")  
+
+# Filter for those genes
+genes_to_label_sdz1 <- maternal_sdz1.MAST[rownames(maternal_sdz1.MAST) %in% highlight_genes_sdz1, ]
+
+
+genes_to_label_sdz1$label_x <- genes_to_label_sdz1$pct.1
+genes_to_label_sdz1$label_y <- genes_to_label_sdz1$pct.2
+```
+
+```{r}
+
+ggplot(maternal_sdz1.MAST, aes(x = pct.1, y = pct.2, color = group)) +
+  geom_point(data = subset(maternal_sdz1.MAST, group == "None"),
+             color = "grey", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_sdz1.MAST, group == "Up"),
+             color = "indianred", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_sdz1.MAST, group == "Down"),
+             color = "dodgerblue2", alpha = 1, size = 8) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "purple") +
+  
+  # Connector lines
+  geom_segment(data = genes_to_label_sdz1,
+               aes(x = pct.1, y = pct.2, xend = label_x, yend = label_y),
+               inherit.aes = FALSE, color = "black", size = 0.3) +
+  
+  # Triangle markers
+  geom_point(data = genes_to_label_sdz1,
+             aes(x = label_x, y = label_y),
+             shape = 17, size = 2, color = "black", inherit.aes = FALSE) +
+  
+  # Repelled labels
+  geom_text_repel(data = genes_to_label_sdz1,
+                  aes(x = label_x, y = label_y, label = rownames(genes_to_label_sdz1)),
+                  color = "black", size = 5,
+                  min.segment.length = 0, force = 2, max.overlaps = Inf) +
+
+  scale_color_manual(values = c("Up" = "indianred", "None" = "grey", "Down" = "dodgerblue2"),
+                     labels = c(paste0("Up = ", up_count_sdz1),
+                                paste0("None = ", none_count_sdz1),
+                                paste0("Down = ", down_count_sdz1))) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = 16)) +
+  labs(x = "Detection in HFHS (%)",
+       y = "Detection in Chow (%)",
+       title = "sdz1 Cells – DGE Scatter with Selected Gene Labels")
+
+
+```
+
+
+
+
+
+```{r}
+
+maternal_sdz2.MAST$gene <- rownames(maternal_sdz2.MAST)
+
+# Define thresholds
+logfc_threshold <- 0.4
+padj_threshold <- 0.05
+
+# Categorize genes
+maternal_sdz2.MAST$group <- "None"
+maternal_sdz2.MAST$group[maternal_sdz2.MAST$avg_log2FC > logfc_threshold & maternal_sdz2.MAST$p_val_adj < padj_threshold] <- "Up"
+maternal_sdz2.MAST$group[maternal_sdz2.MAST$avg_log2FC < -logfc_threshold & maternal_sdz2.MAST$p_val_adj < padj_threshold] <- "Down"
+
+# Factor levels to control legend order
+maternal_sdz2.MAST$group <- factor(maternal_sdz2.MAST$group, levels = c("Up", "None", "Down"))
+
+# Counts for legend
+up_count_sdz2 <- sum(maternal_sdz2.MAST$group == "Up")
+none_count_sdz2 <- sum(maternal_sdz2.MAST$group == "None")
+down_count_sdz2 <- sum(maternal_sdz2.MAST$group == "Down")
+```
+
+
+
+```{r}
+# Define the genes of interests
+highlight_genes_sdz2 <- c("Bmp7", "Dkk2", "Fgf10", "Kitl", "Nos1", "Ptpro", "Tnfaip2","Slc6a6", "Chodl", "Stra6", "Synm")  
+
+# Filter for those genes
+genes_to_label_sdz2 <- maternal_sdz2.MAST[rownames(maternal_sdz2.MAST) %in% highlight_genes_sdz2, ]
+
+
+genes_to_label_sdz2$label_x <- genes_to_label_sdz2$pct.1
+genes_to_label_sdz2$label_y <- genes_to_label_sdz2$pct.2
+```
+
+```{r}
+
+ggplot(maternal_sdz2.MAST, aes(x = pct.1, y = pct.2, color = group)) +
+  geom_point(data = subset(maternal_sdz2.MAST, group == "None"),
+             color = "grey", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_sdz2.MAST, group == "Up"),
+             color = "indianred", alpha = 1, size = 8) +
+  geom_point(data = subset(maternal_sdz2.MAST, group == "Down"),
+             color = "dodgerblue2", alpha = 1, size = 8) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "purple") +
+  
+  # Connector lines
+  geom_segment(data = genes_to_label_sdz2,
+               aes(x = pct.1, y = pct.2, xend = label_x, yend = label_y),
+               inherit.aes = FALSE, color = "black", size = 0.3) +
+  
+  # Triangle markers
+  geom_point(data = genes_to_label_sdz2,
+             aes(x = label_x, y = label_y),
+             shape = 17, size = 2, color = "black", inherit.aes = FALSE) +
+  
+  # Repelled labels
+  geom_text_repel(data = genes_to_label_sdz2,
+                  aes(x = label_x, y = label_y, label = rownames(genes_to_label_sdz2)),
+                  color = "black", size = 5,
+                  min.segment.length = 0, force = 2, max.overlaps = Inf) +
+
+  scale_color_manual(values = c("Up" = "indianred", "None" = "grey", "Down" = "dodgerblue2"),
+                     labels = c(paste0("Up = ", up_count_sdz2),
+                                paste0("None = ", none_count_sdz2),
+                                paste0("Down = ", down_count_sdz2))) +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.title = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = 16)) +
+  labs(x = "Detection in HFHS (%)",
+       y = "Detection in Chow (%)",
+       title = "sdz2 Cells – DGE Scatter with Selected Gene Labels")
+
+
+```
+
+
+
+
+#Figure3E and Table7 - SCPA
+
+```{r}
+maternal_udstr <- subset(x = maternal_stroma, idents = c("0"))
+maternal_pdz1 <- subset(x = maternal_stroma, idents = c("3"))
+maternal_pdz2 <- subset(x = maternal_stroma, idents = c("4"))
+maternal_sdz1 <- subset(x = maternal_stroma, idents = c("1"))
+maternal_sdz2 <- subset(x = maternal_stroma, idents = c("2"))
+
+```
+
+#Overwriting SCPA compare_seurat function to include more cells to the comparison (default=500, change it to 3000)
+
+```{r}
+
+compare_seurat <- function(seurat_object,
+                           assay = "RNA",
+                           group1 = NULL,
+                           group1_population = NULL,
+                           group2 = NULL,
+                           group2_population = NULL,
+                           pathways,
+                           downsample = 3000,
+                           min_genes = 15,
+                           max_genes = 500,
+                           parallel = FALSE,
+                           cores = NULL) {
+
+  ## Pathways
+  if (class(pathways)[1] == "character") {
+    pathways <- get_paths(pathways)
+  }
+  path_names <- sapply(pathways, function(x) unique(x$Pathway))
+
+  ## Convert population to character vector
+  group1_population <- as.character(group1_population)
+
+  ## Seurat extract
+  if (is.null(group2)) {
+    samples <- list()
+    for (i in group1_population) {
+      samples[[i]] <- seurat_extract(seurat_object,
+                                     assay = assay,
+                                     meta1 = group1,
+                                     value_meta1 = i)
+    }
+  }
+
+  if (!is.null(group2)) {
+    samples <- list()
+    for (i in group1_population) {
+      samples[[i]] <- seurat_extract(seurat_object,
+                                     assay = assay,
+                                     meta1 = group1,
+                                     value_meta1 = i,
+                                     meta2 = group2,
+                                     value_meta2 = group2_population)
+    }
+  }
+
+  if (parallel == FALSE) {
+
+    mcm_output <- compare_pathways(samples = samples,
+                                   pathways = pathways,
+                                   downsample = downsample,
+                                   min_genes = min_genes,
+                                   max_genes = max_genes)
+
+  } else {
+
+    mcm_output <- compare_pathways(samples = samples,
+                                   pathways = pathways,
+                                   downsample = downsample,
+                                   min_genes = min_genes,
+                                   max_genes = max_genes,
+                                   parallel = TRUE,
+                                   cores = cores)
+
+  }
+
+
+  return(mcm_output)
+
+}
+```
+
+
+
+
+```{r}
+pathway_names <- c("hallmark")
+hallmark_sets <- msigdbr("mouse") %>%
+  filter(grepl(paste(pathway_names, collapse = "|"), gs_name, ignore.case = T)) %>%
+  format_pathways()
+```
+
+```{r}
+#Comparing
+scpa_udstr_hallmark <- compare_seurat(maternal_udstr,
+              assay = "RNA",                          
+              group1 = "Condition",
+              group1_population = c("Maternal Chow", "Maternal HFHS"),  
+
+              pathways = hallmark_sets,
+              parallel = TRUE, cores = 16)
+```
+
+
+
+
+
+```{r}
+pathway_names <- c("hallmark")
+hallmark_sets <- msigdbr("mouse") %>%
+  filter(grepl(paste(pathway_names, collapse = "|"), gs_name, ignore.case = T)) %>%
+  format_pathways()
+```
+
+```{r}
+#Comparing
+scpa_pdz1_hallmark <- compare_seurat(maternal_pdz1,
+              assay = "RNA",                          
+              group1 = "Condition",
+              group1_population = c("Maternal Chow", "Maternal HFHS"),  
+
+              pathways = hallmark_sets,
+              parallel = TRUE, cores = 16)
+```
+
+
+
+
+
+```{r}
+pathway_names <- c("hallmark")
+hallmark_sets <- msigdbr("mouse") %>%
+  filter(grepl(paste(pathway_names, collapse = "|"), gs_name, ignore.case = T)) %>%
+  format_pathways()
+```
+
+```{r}
+#Comparing
+scpa_pdz2_hallmark <- compare_seurat(maternal_pdz2,
+              assay = "RNA",                          
+              group1 = "Condition",
+              group1_population = c("Maternal Chow", "Maternal HFHS"),  
+
+              pathways = hallmark_sets,
+              parallel = TRUE, cores = 16)
+```
+
+
+
+
+```{r}
+pathway_names <- c("hallmark")
+hallmark_sets <- msigdbr("mouse") %>%
+  filter(grepl(paste(pathway_names, collapse = "|"), gs_name, ignore.case = T)) %>%
+  format_pathways()
+```
+
+```{r}
+#Comparing
+scpa_sdz1_hallmark <- compare_seurat(maternal_sdz1,
+              assay = "RNA",                          
+              group1 = "Condition",
+              group1_population = c("Maternal Chow", "Maternal HFHS"),  
+
+              pathways = hallmark_sets,
+              parallel = TRUE, cores = 16)
+```
+
+
+
+
+
+
+```{r}
+pathway_names <- c("hallmark")
+hallmark_sets <- msigdbr("mouse") %>%
+  filter(grepl(paste(pathway_names, collapse = "|"), gs_name, ignore.case = T)) %>%
+  format_pathways()
+```
+
+```{r}
+#Comparing
+scpa_sdz2_hallmark <- compare_seurat(maternal_sdz2,
+              assay = "RNA",                          
+              group1 = "Condition",
+              group1_population = c("Maternal Chow", "Maternal HFHS"),  
+
+              pathways = hallmark_sets,
+              parallel = TRUE, cores = 16)
+```
+
+
+
+
+
+
+```{r}
+
+scpa_udstr_hallmark <- scpa_udstr_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_udstr_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 9.5, shape = 21, fill = scpa_udstr_hallmark$color, stroke = 0.3) +
+ xlim(-3, 5) +
+ ylim(0, 6) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+```
+
+
+
+
+```{r}
+
+scpa_pdz2_hallmark <- scpa_pdz2_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_pdz2_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 9.5, shape = 21, fill = scpa_pdz2_hallmark$color, stroke = 0.3) +
+ xlim(-5, 5) +
+ ylim(0, 4.5) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+```
+
+
+
+```{r}
+
+scpa_sdz2_hallmark <- scpa_sdz2_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_sdz2_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 9.5, shape = 21, fill = scpa_sdz2_hallmark$color, stroke = 0.3) +
+ xlim(-5, 4) +
+ ylim(0, 4) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+```
+
+
+#Figure S3A: Dotplot-Markers
+```{r}
+
+Idents       (maternal_stroma) <- "strsubset"
+
+
+dec_mark <- c("Vim","Snai2","Sfrp4","Igfbp5","Ogn","A2m","H19","Dio3","Rrm2","Bmp2","Krt19","Ptgs2","Scrib","Top2a","Hist1h2af","Scara5","Apoe","Igfbp3","Myc","Dio2","Rb1","Foxp2")
+
+my_levels <- c("udStr","PDZ1","PDZ2","SDZ1","SDZ2")
+
+my_levels <- rev(my_levels)
+maternal_stroma@active.ident <- factor (maternal_stroma@active.ident, levels = my_levels)
+
+DotPlot (maternal_stroma,
+         features  = dec_mark,
+         assay     = "RNA",
+         cols      = c("lightgrey", "red"),
+         col.min   = 0,
+         col.max   = 1,
+         dot.min   = 0,
+         dot.scale = 15)+ RotatedAxis()
+
+```
+
+#Figure S3B: Pie plot, split by diet
+
+#Cell number info for each cluster in CON and HFHS
+```{r}
+library(data.table)
+library(magrittr)
+md_con <- maternal_con@meta.data %>% as.data.table
+md_con[, .N, by = "stromatype"]
+```
+
+```{r}
+md_hfhs <- maternal_hfhs@meta.data %>% as.data.table
+md_hfhs[, .N, by = "stromatype"]
+```
+
+```{r}
+# Create a dataframe
+df <- data.frame(
+  Condition = rep(c("Maternal Chow", "Maternal HFHS"), each = 5),
+  CellType = c("udStr", "PDZ1", "PDZ2","SDZ1","SDZ2"),
+  Frequency = c(0.35453899,
+0.179568618,
+0.05844987,
+0.23185589,
+0.175586632,
+0.346405503,
+0.162779968,
+0.041607248,
+0.262184381,
+0.187022901 )
+)
+
+# Function to generate a pie chart for each condition
+make_pie_chart <- function(df, condition_name) {
+  df_group <- df %>% filter(Condition == condition_name)
+  
+  ggplot(df_group, aes(x = "", y = Frequency, fill = CellType)) +
+    geom_bar(stat = "identity", width = 1, color = "white") +
+    coord_polar(theta = "y") +
+    labs(title = paste("Cell Type Proportions -", condition_name), fill = "Cell Type") +
+    theme_void() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      legend.position = "right"
+    )
+}
+
+p1 <- make_pie_chart(df, "Maternal Chow")
+p2 <- make_pie_chart(df, "Maternal HFHS")
+
+grid.arrange(p1, p2, ncol = 2)
+
+```
+
+
+#FigureS3C - SCPA
+
+```{r}
+
+scpa_pdz1_hallmark <- scpa_pdz1_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_pdz1_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 9.5, shape = 21, fill = scpa_pdz1_hallmark$color, stroke = 0.3) +
+ xlim(-6, 6) +
+ ylim(0, 7) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+
+
+scpa_sdz1_hallmark <- scpa_sdz1_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_sdz1_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 9.5, shape = 21, fill = scpa_sdz1_hallmark$color, stroke = 0.3) +
+ xlim(-5, 5) +
+ ylim(0, 4.5) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+```

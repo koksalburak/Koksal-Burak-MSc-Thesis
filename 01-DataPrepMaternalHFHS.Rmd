@@ -1,0 +1,1699 @@
+---
+title: "01-Data Preparation and Integration"
+output: html_document
+date: "2025-06-17"
+---
+
+
+
+```{r setup, include=FALSE}
+library(Seurat)
+library(Matrix)
+library(SingleCellExperiment)
+library(tidyverse)
+library(scales)
+library(cowplot)
+library(dplyr)
+library(ggplot2)
+library(sctransform)
+library(ggraph)
+library(clustree)
+library(plotly)
+library(RCurl)
+library(harmony)
+library(AnnotationHub)
+library(ensembldb)
+library(shiny)
+library(scater)
+library(xlsx)
+library(DESeq2)
+library(ggrepel)
+library(ggpubr)
+library(enrichplot)
+library(openxlsx)
+library(clusterProfiler)
+library(brew)
+library(RColorBrewer)
+library(DOSE)
+library(pathview)
+library(org.Mm.eg.db)
+library(readxl)
+library(EnhancedVolcano)
+library(gridExtra)
+library(magrittr)
+library(data.table)
+library(scDblFinder)
+
+```
+
+#Reading the sequencing data for maternal obesity project and creating the Seurat objects
+
+# Read in the respective velocity data
+```{r}
+OB98 <- Read10X(data.dir = "~/Maternal_Obesity/data/OB98")
+OB98 <- CreateSeuratObject (counts = OB98, project = "OB98")
+
+velo98 <- read.loom.matrices ("~/Maternal_Obesity/velocity/OB98.loom")
+colnames (velo98$spliced)   <- paste        (substring (colnames (velo98$spliced),   23, 38), sep = "")
+colnames (velo98$spliced)   <- paste                   (colnames (velo98$spliced),   "-1",    sep = "")
+colnames (velo98$unspliced) <- paste        (substring (colnames (velo98$unspliced), 23, 38), sep = "")
+colnames (velo98$unspliced) <- paste                   (colnames (velo98$unspliced), "-1",    sep = "")
+colnames (velo98$ambiguous) <- paste        (substring (colnames (velo98$ambiguous), 23, 38), sep = "")
+colnames (velo98$ambiguous) <- paste                   (colnames (velo98$ambiguous), "-1",    sep = "")
+
+
+
+for (i in names (x = velo98)) { 
+          OB98[[i]] <- CreateAssayObject(counts = velo98[[i]]) 
+}
+
+Chow69 <- Read10X(data.dir = "~/Maternal_Obesity/data/Chow69")
+Chow69 <- CreateSeuratObject (counts = Chow69, project = "Chow69")
+
+velo69 <- read.loom.matrices ("~/Maternal_Obesity/velocity/Chow69.loom")
+colnames (velo69$spliced)   <- paste        (substring (colnames (velo69$spliced),   24, 39), sep = "")
+colnames (velo69$spliced)   <- paste                   (colnames (velo69$spliced),   "-1",    sep = "")
+colnames (velo69$unspliced) <- paste        (substring (colnames (velo69$unspliced), 24, 39), sep = "")
+colnames (velo69$unspliced) <- paste                   (colnames (velo69$unspliced), "-1",    sep = "")
+colnames (velo69$ambiguous) <- paste        (substring (colnames (velo69$ambiguous), 24, 39), sep = "")
+colnames (velo69$ambiguous) <- paste                   (colnames (velo69$ambiguous), "-1",    sep = "")
+for (i in names (x = velo69)) { Chow69[[i]] <- CreateAssayObject(counts = velo69[[i]]) }
+
+
+OB100 <- Read10X(data.dir = "~/Maternal_Obesity/data/OB100")
+OB100 <- CreateSeuratObject (counts = OB100, project = "OB100")
+
+velo100 <- read.loom.matrices ("~/Maternal_Obesity/velocity/OB100.loom")
+colnames (velo100$spliced)   <- paste        (substring (colnames (velo100$spliced),   24, 39), sep = "")
+colnames (velo100$spliced)   <- paste                   (colnames (velo100$spliced),   "-1",    sep = "")
+colnames (velo100$unspliced) <- paste        (substring (colnames (velo100$unspliced), 24, 39), sep = "")
+colnames (velo100$unspliced) <- paste                   (colnames (velo100$unspliced), "-1",    sep = "")
+colnames (velo100$ambiguous) <- paste        (substring (colnames (velo100$ambiguous), 24, 39), sep = "")
+colnames (velo100$ambiguous) <- paste                   (colnames (velo100$ambiguous), "-1",    sep = "")
+
+for (i in names (x = velo100)) { OB100[[i]] <- CreateAssayObject(counts = velo100[[i]]) }
+
+
+Chow70 <- Read10X(data.dir = "~/Maternal_Obesity/data/Chow70")
+Chow70 <- CreateSeuratObject (counts = Chow70, project = "Chow70")
+
+velo70 <- read.loom.matrices ("~/Maternal_Obesity/velocity/Chow70.loom")
+colnames (velo70$spliced)   <- paste        (substring (colnames (velo70$spliced),   24, 39), sep = "")
+colnames (velo70$spliced)   <- paste                   (colnames (velo70$spliced),   "-1",    sep = "")
+colnames (velo70$unspliced) <- paste        (substring (colnames (velo70$unspliced), 24, 39), sep = "")
+colnames (velo70$unspliced) <- paste                   (colnames (velo70$unspliced), "-1",    sep = "")
+colnames (velo70$ambiguous) <- paste        (substring (colnames (velo70$ambiguous), 24, 39), sep = "")
+colnames (velo70$ambiguous) <- paste                   (colnames (velo70$ambiguous), "-1",    sep = "")
+for (i in names (x = velo70)) { Chow70[[i]] <- CreateAssayObject(counts = velo70[[i]]) }
+
+
+OB83 <- Read10X(data.dir = "~/Maternal_Obesity/data/OB83")
+OB83 <- CreateSeuratObject (counts = OB83, project = "OB83")
+
+velo83 <- read.loom.matrices ("~/Maternal_Obesity/velocity/OB83.loom")
+colnames (velo83$spliced)   <- paste        (substring (colnames (velo83$spliced),   24, 39), sep = "")
+colnames (velo83$spliced)   <- paste                   (colnames (velo83$spliced),   "-1",    sep = "")
+colnames (velo83$unspliced) <- paste        (substring (colnames (velo83$unspliced), 24, 39), sep = "")
+colnames (velo83$unspliced) <- paste                   (colnames (velo83$unspliced), "-1",    sep = "")
+colnames (velo83$ambiguous) <- paste        (substring (colnames (velo83$ambiguous), 24, 39), sep = "")
+colnames (velo83$ambiguous) <- paste                   (colnames (velo83$ambiguous), "-1",    sep = "")
+for (i in names (x = velo83)) { OB83[[i]] <- CreateAssayObject(counts = velo83[[i]]) }
+
+
+OB95 <- Read10X(data.dir = "~/Maternal_Obesity/data/OB95")
+OB95 <- CreateSeuratObject (counts = OB95, project = "OB95")
+
+velo95 <- read.loom.matrices ("~/Maternal_Obesity/velocity/OB95.loom")
+colnames (velo95$spliced)   <- paste        (substring (colnames (velo95$spliced),   24, 39), sep = "")
+colnames (velo95$spliced)   <- paste                   (colnames (velo95$spliced),   "-1",    sep = "")
+colnames (velo95$unspliced) <- paste        (substring (colnames (velo95$unspliced), 24, 39), sep = "")
+colnames (velo95$unspliced) <- paste                   (colnames (velo95$unspliced), "-1",    sep = "")
+colnames (velo95$ambiguous) <- paste        (substring (colnames (velo95$ambiguous), 24, 39), sep = "")
+colnames (velo95$ambiguous) <- paste                   (colnames (velo95$ambiguous), "-1",    sep = "")
+for (i in names (x = velo95)) { OB95[[i]] <- CreateAssayObject(counts = velo95[[i]]) }
+
+
+Chow64 <- Read10X(data.dir = "~/Maternal_Obesity/data/Chow64")
+Chow64 <- CreateSeuratObject (counts = Chow64, project = "Chow64")
+
+velo64 <- read.loom.matrices ("~/Maternal_Obesity/velocity/Chow64.loom")
+colnames (velo64$spliced)   <- paste        (substring (colnames (velo64$spliced),   25, 40), sep = "")
+colnames (velo64$spliced)   <- paste                   (colnames (velo64$spliced),   "-1",    sep = "")
+colnames (velo64$unspliced) <- paste        (substring (colnames (velo64$unspliced), 25, 40), sep = "")
+colnames (velo64$unspliced) <- paste                   (colnames (velo64$unspliced), "-1",    sep = "")
+colnames (velo64$ambiguous) <- paste        (substring (colnames (velo64$ambiguous), 25, 40), sep = "")
+colnames (velo64$ambiguous) <- paste                   (colnames (velo64$ambiguous), "-1",    sep = "")
+for (i in names (x = velo64)) { Chow64[[i]] <- CreateAssayObject(counts = velo64[[i]]) }
+
+
+OB96 <- Read10X(data.dir = "~/Maternal_Obesity/data/OB96")
+OB96 <- CreateSeuratObject (counts = OB96, project = "OB96")
+
+velo96 <- read.loom.matrices ("~/Maternal_Obesity/velocity/OB96.loom")
+colnames (velo96$spliced)   <- paste        (substring (colnames (velo96$spliced),   24, 39), sep = "")
+colnames (velo96$spliced)   <- paste                   (colnames (velo96$spliced),   "-1",    sep = "")
+colnames (velo96$unspliced) <- paste        (substring (colnames (velo96$unspliced), 24, 39), sep = "")
+colnames (velo96$unspliced) <- paste                   (colnames (velo96$unspliced), "-1",    sep = "")
+colnames (velo96$ambiguous) <- paste        (substring (colnames (velo96$ambiguous), 24, 39), sep = "")
+colnames (velo96$ambiguous) <- paste                   (colnames (velo96$ambiguous), "-1",    sep = "")
+for (i in names (x = velo96)) { OB96[[i]] <- CreateAssayObject(counts = velo96[[i]]) }
+
+
+Chow79 <- Read10X(data.dir = "~/Maternal_Obesity/data/Chow79")
+Chow79 <- CreateSeuratObject (counts = Chow79, project = "Chow79")
+
+velo79 <- read.loom.matrices ("~/Maternal_Obesity/velocity/Chow79.loom")
+colnames (velo79$spliced)   <- paste        (substring (colnames (velo79$spliced),   25, 40), sep = "")
+colnames (velo79$spliced)   <- paste                   (colnames (velo79$spliced),   "-1",    sep = "")
+colnames (velo79$unspliced) <- paste        (substring (colnames (velo79$unspliced), 25, 40), sep = "")
+colnames (velo79$unspliced) <- paste                   (colnames (velo79$unspliced), "-1",    sep = "")
+colnames (velo79$ambiguous) <- paste        (substring (colnames (velo79$ambiguous), 25, 40), sep = "")
+colnames (velo79$ambiguous) <- paste                   (colnames (velo79$ambiguous), "-1",    sep = "")
+for (i in names (x = velo79)) { Chow79[[i]] <- CreateAssayObject(counts = velo79[[i]]) }
+
+
+Chow82 <- Read10X(data.dir = "~/Maternal_Obesity/data/Chow82")
+Chow82 <- CreateSeuratObject (counts = Chow82, project = "Chow82")
+
+velo82 <- read.loom.matrices ("~/Maternal_Obesity/velocity/Chow82.loom")
+colnames (velo82$spliced)   <- paste        (substring (colnames (velo82$spliced),   25, 40), sep = "")
+colnames (velo82$spliced)   <- paste                   (colnames (velo82$spliced),   "-1",    sep = "")
+colnames (velo82$unspliced) <- paste        (substring (colnames (velo82$unspliced), 25, 40), sep = "")
+colnames (velo82$unspliced) <- paste                   (colnames (velo82$unspliced), "-1",    sep = "")
+colnames (velo82$ambiguous) <- paste        (substring (colnames (velo82$ambiguous), 25, 40), sep = "")
+colnames (velo82$ambiguous) <- paste                   (colnames (velo82$ambiguous), "-1",    sep = "")
+for (i in names (x = velo82)) { Chow82[[i]] <- CreateAssayObject(counts = velo82[[i]]) }
+
+```
+
+
+
+#Adding condition information to the metadata
+```{r}
+OB100$Condition <- NA
+OB100$Condition[which(str_detect(OB100$orig.ident, "OB100"))] <- "Maternal HFHS"
+
+OB98$Condition <- NA
+OB98$Condition[which(str_detect(OB98$orig.ident, "OB98"))] <- "Maternal HFHS"
+
+Chow69$Condition <- NA
+Chow69$Condition[which(str_detect(Chow69$orig.ident, "Chow69"))] <- "Maternal Chow"
+
+Chow70$Condition <- NA
+Chow70$Condition[which(str_detect(Chow70$orig.ident, "Chow70"))] <- "Maternal Chow"
+
+OB83$Condition <- NA
+OB83$Condition[which(str_detect(OB83$orig.ident, "OB83"))] <- "Maternal HFHS"
+
+OB95$Condition <- NA
+OB95$Condition[which(str_detect(OB95$orig.ident, "OB95"))] <- "Maternal HFHS"
+
+Chow64$Condition <- NA
+Chow64$Condition[which(str_detect(Chow64$orig.ident, "Chow64"))] <- "Maternal Chow"
+
+OB96$Condition <- NA
+OB96$Condition[which(str_detect(OB96$orig.ident, "OB96"))] <- "Maternal HFHS"
+
+Chow79$Condition <- NA
+Chow79$Condition[which(str_detect(Chow79$orig.ident, "Chow79"))] <- "Maternal Chow"
+
+Chow82$Condition <- NA
+Chow82$Condition[which(str_detect(Chow82$orig.ident, "Chow82"))] <- "Maternal Chow"
+```
+
+#Adding mitochondrial percentage information for each cell in the dataset
+```{r}
+OB100$percent.mt <- PercentageFeatureSet(object = OB100, pattern = "^mt-")
+OB100$percent.mt <- OB100@meta.data$percent.mt / 100
+
+OB98$percent.mt <- PercentageFeatureSet(object = OB98, pattern = "^mt-")
+OB98$percent.mt <- OB98@meta.data$percent.mt / 100
+
+Chow69$percent.mt <- PercentageFeatureSet(object = Chow69, pattern = "^mt-")
+Chow69$percent.mt <- Chow69@meta.data$percent.mt / 100
+
+Chow70$percent.mt <- PercentageFeatureSet(object = Chow70, pattern = "^mt-")
+Chow70$percent.mt <- Chow70@meta.data$percent.mt / 100
+
+OB83$percent.mt <- PercentageFeatureSet(object = OB83, pattern = "^mt-")
+OB83$percent.mt <- OB83@meta.data$percent.mt / 100
+
+OB95$percent.mt <- PercentageFeatureSet(object = OB95, pattern = "^mt-")
+OB95$percent.mt <- OB95@meta.data$percent.mt / 100
+
+Chow64$percent.mt <- PercentageFeatureSet(object = Chow64, pattern = "^mt-")
+Chow64$percent.mt <- Chow64@meta.data$percent.mt / 100
+
+OB96$percent.mt <- PercentageFeatureSet(object = OB96, pattern = "^mt-")
+OB96$percent.mt <- OB96@meta.data$percent.mt / 100
+
+Chow79$percent.mt <- PercentageFeatureSet(object = Chow79, pattern = "^mt-")
+Chow79$percent.mt <- Chow79@meta.data$percent.mt / 100
+
+Chow82$percent.mt <- PercentageFeatureSet(object = Chow82, pattern = "^mt-")
+Chow82$percent.mt <- Chow82@meta.data$percent.mt / 100
+```
+
+#Adding embryonic day info to the metadata
+```{r}
+OB100$EmbryonicDay <- "E5.5"
+
+OB98$EmbryonicDay <- "E5.5"
+
+Chow69$EmbryonicDay <- "E5.5"
+
+Chow70$EmbryonicDay <- "E5.5"
+
+OB83$EmbryonicDay <- "E5.5"
+
+OB95$EmbryonicDay <- "E5.5"
+
+Chow64$EmbryonicDay <- "E5.5"
+
+OB96$EmbryonicDay <- "E5.5"
+
+Chow79$EmbryonicDay <- "E5.5"
+
+Chow82$EmbryonicDay <- "E5.5"
+```
+
+#Adding the sequencing batch info to the metadata
+```{r}
+OB100$Batch <- "2"
+
+OB98$Batch <- "2"
+
+Chow69$Batch <- "2"
+
+Chow70$Batch <- "2"
+
+OB83$Batch <- "1"
+
+OB95$Batch <- "1"
+
+Chow64$Batch <- "1"
+
+OB96$Batch <- "1"
+
+Chow79$Batch <- "3"
+
+Chow82$Batch <- "3"
+```
+
+#Adding the ribosomal genes to metadata
+```{r}
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (OB100), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (OB100, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (OB100, slot   = 'counts'));
+OB100 [['percent.ribo']] <- percent.ribo
+
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (OB98), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (OB98, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (OB98, slot   = 'counts'));
+OB98 [['percent.ribo']] <- percent.ribo
+
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (Chow69), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (Chow69, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (Chow69, slot   = 'counts'));
+Chow69 [['percent.ribo']] <- percent.ribo
+
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (Chow70), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (Chow70, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (Chow70, slot   = 'counts'));
+Chow70 [['percent.ribo']] <- percent.ribo
+
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (OB83), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (OB83, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (OB83, slot   = 'counts'));
+OB83 [['percent.ribo']] <- percent.ribo
+
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (OB95), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (OB95, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (OB95, slot   = 'counts'));
+OB95 [['percent.ribo']] <- percent.ribo
+
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (Chow64), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (Chow64, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (Chow64, slot   = 'counts'));
+Chow64 [['percent.ribo']] <- percent.ribo
+
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (OB96), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (OB96, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (OB96, slot   = 'counts'));
+OB96 [['percent.ribo']] <- percent.ribo
+
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (Chow79), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (Chow79, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (Chow79, slot   = 'counts'));
+Chow79 [['percent.ribo']] <- percent.ribo
+
+ribo.genes <- grep (pattern = "^Rp[sl][[:digit:]]", x = rownames (Chow82), value = TRUE);
+percent.ribo <- Matrix::colSums (x = GetAssayData (Chow82, slot   = 'counts')[ribo.genes, ])/Matrix::colSums (x = GetAssayData (Chow82, slot   = 'counts'));
+Chow82 [['percent.ribo']] <- percent.ribo
+
+```
+
+#Violin Plots for unfiltered data
+```{r}
+VlnPlot(OB100, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+VlnPlot(OB98, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+VlnPlot(Chow70, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+VlnPlot(Chow69, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+VlnPlot(OB83, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+VlnPlot(OB95, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+VlnPlot(Chow64, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+VlnPlot(OB96, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+VlnPlot(Chow79, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+VlnPlot(Chow82, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), ncol = 4)
+
+```
+
+#Checking one of the samples if the condition, mitochondrial percentage, embryonic day, batch info, and ribosomal percentages are there
+```{r}
+head(OB100@meta.data)
+VlnPlot(OB100, features=c("nCount_RNA","percent.mt", "percent.ribo"))
+
+as_tibble(
+  OB100[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","red","yellow")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 750) +
+  geom_hline(yintercept = 2000) 
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point(size=0.7) + 
+  scale_color_gradientn(colors=c("black","blue","green2","red","yellow")) +
+  ggtitle("Mitochondrial Gene Percentage Log Scale") +
+  geom_hline(yintercept = 750) +
+  geom_hline(yintercept = 2000) +
+  scale_x_log10() + scale_y_log10()
+
+qc.metrics %>%
+  arrange(percent.ribo) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.ribo)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","red","yellow")) +
+  ggtitle("Ribosomal Gene Percentage") +
+  geom_hline(yintercept = 750) +
+  geom_hline(yintercept = 2000) 
+
+qc.metrics %>%
+  ggplot(aes(percent.mt)) + 
+  geom_histogram(binwidth = 0.05, fill="yellow", colour="black") +
+  ggtitle("Mitochondrial Percentage Distribution") +
+  geom_vline(xintercept = 0.25)
+
+qc.metrics %>%
+  ggplot(aes(percent.ribo)) + 
+  geom_histogram(binwidth = 0.05, fill="yellow", colour="black") +
+  ggtitle("Percentage Distribution of Ribosomal Genes") +
+  geom_vline(xintercept = 0.4)
+```
+
+#Featureplot and mt percentages
+```{r}
+as_tibble(
+  OB100[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+
+as_tibble(
+  OB98[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+
+as_tibble(
+  Chow69[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+
+as_tibble(
+  Chow70[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+
+as_tibble(
+  OB83[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+
+as_tibble(
+  OB95[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+
+as_tibble(
+  Chow64[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+
+as_tibble(
+  OB96[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+
+as_tibble(
+  Chow79[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+
+as_tibble(
+  Chow82[[]],
+  rownames="Cell.Barcode"
+) -> qc.metrics
+
+head(qc.metrics)
+
+qc.metrics %>%
+  arrange(percent.mt) %>%
+  ggplot(aes(nCount_RNA,nFeature_RNA,colour=percent.mt)) + 
+  geom_point() + 
+  scale_color_gradientn(colors=c("black","blue","green2","yellow","red")) +
+  ggtitle("Mitochondrial Gene Percentage") +
+  geom_hline(yintercept = 1000) +
+  geom_hline(yintercept = 7500) 
+```
+
+
+
+
+
+
+```{r}
+filtered_OB100 <- subset(x = OB100, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) & 
+                           (nFeature_RNA < 7500) & 
+                           (percent.mt < 0.10))
+
+filtered_OB98 <- subset(x = OB98, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) & 
+                           (nFeature_RNA < 7500) & 
+                           (percent.mt < 0.10))
+
+filtered_Chow70 <- subset(x = Chow70, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) &
+                           (nFeature_RNA < 7500) &
+                           (percent.mt < 0.10))
+
+filtered_Chow69 <- subset(x = Chow69, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) &
+                           (nFeature_RNA < 7500) &
+                           (percent.mt < 0.10))
+
+filtered_OB83 <- subset(x = OB83, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) &
+                           (nFeature_RNA < 7500) &
+                           (percent.mt < 0.10))
+
+filtered_OB95 <- subset(x = OB95, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) & 
+                           (nFeature_RNA < 7500) &
+                           (percent.mt < 0.10))
+
+filtered_Chow64 <- subset(x = Chow64, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) &
+                           (nFeature_RNA < 7500) &
+                           (percent.mt < 0.10))
+
+filtered_OB96 <- subset(x = OB96, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) &
+                           (nFeature_RNA < 7500) &
+                           (percent.mt < 0.10))
+
+filtered_Chow79 <- subset(x = Chow79, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) &
+                           (nFeature_RNA < 7500) &
+                           (percent.mt < 0.10))
+
+filtered_Chow82 <- subset(x = Chow82, 
+                         subset= (nCount_RNA >= 500) & 
+                           (nFeature_RNA >= 1000) &
+                           (nFeature_RNA < 7500) &
+                           (percent.mt < 0.10))
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_OB100, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_OB100 <- CreateSeuratObject(filtered_counts, meta.data = filtered_OB100@meta.data)
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_OB98, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_OB98 <- CreateSeuratObject(filtered_counts, meta.data = filtered_OB98@meta.data)
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_OB96, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_OB96 <- CreateSeuratObject(filtered_counts, meta.data = filtered_OB96@meta.data)
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_OB95, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_OB95 <- CreateSeuratObject(filtered_counts, meta.data = filtered_OB95@meta.data)
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_OB83, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_OB83 <- CreateSeuratObject(filtered_counts, meta.data = filtered_OB83@meta.data)
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_Chow70, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_Chow70 <- CreateSeuratObject(filtered_counts, meta.data = filtered_Chow70@meta.data)
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_Chow64, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_Chow64 <- CreateSeuratObject(filtered_counts, meta.data = filtered_Chow64@meta.data)
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_Chow69, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_Chow69 <- CreateSeuratObject(filtered_counts, meta.data = filtered_Chow69@meta.data)
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_Chow79, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_Chow79 <- CreateSeuratObject(filtered_counts, meta.data = filtered_Chow79@meta.data)
+```
+
+```{r}
+# Output a logical vector for every gene on whether the more than zero counts per cell
+# Extract counts
+counts <- GetAssayData(object = filtered_Chow82, slot = "counts")
+
+# Output a logical vector for every gene on whether the more than zero counts per cell
+nonzero <- counts > 0
+
+# Sums all TRUE values and returns TRUE if more than 10 TRUE values per gene
+keep_genes <- Matrix::rowSums(nonzero) >= 1
+
+# Only keeping those genes expressed in more than 10 cells
+filtered_counts <- counts[keep_genes, ]
+
+# Reassign to filtered Seurat object
+filtered_Chow82 <- CreateSeuratObject(filtered_counts, meta.data = filtered_Chow82@meta.data)
+```
+
+#Converting the Seurat object into SCE
+```{r}
+filtered_OB100_SCE <- as.SingleCellExperiment(filtered_OB100)
+filtered_OB98_SCE <- as.SingleCellExperiment(filtered_OB98)
+filtered_Chow69_SCE <- as.SingleCellExperiment(filtered_Chow69)
+filtered_Chow70_SCE <- as.SingleCellExperiment(filtered_Chow70)
+filtered_OB83_SCE <- as.SingleCellExperiment(filtered_OB83)
+filtered_OB95_SCE <- as.SingleCellExperiment(filtered_OB95)
+filtered_Chow64_SCE <- as.SingleCellExperiment(filtered_Chow64)
+filtered_OB96_SCE <- as.SingleCellExperiment(filtered_OB96)
+filtered_Chow79_SCE <- as.SingleCellExperiment(filtered_Chow79)
+filtered_Chow82_SCE <- as.SingleCellExperiment(filtered_Chow82)
+
+```
+#Performing scDblFinder
+```{r}
+filtered_OB100_SCE <- scDblFinder(filtered_OB100_SCE, dbr = 0.127 , includePCs = 30,dbr.sd = 0)
+filtered_OB98_SCE <- scDblFinder(filtered_OB98_SCE, dbr = 0.107 , includePCs = 30,dbr.sd = 0)
+filtered_Chow69_SCE <- scDblFinder(filtered_Chow69_SCE, dbr = 0.075 , includePCs = 30,dbr.sd = 0)
+filtered_Chow70_SCE <- scDblFinder(filtered_Chow70_SCE, dbr = 0.047 , includePCs = 30,dbr.sd = 0)
+filtered_OB83_SCE <- scDblFinder(filtered_OB83_SCE, dbr = 0.042 , includePCs = 30,dbr.sd = 0)
+filtered_OB95_SCE <- scDblFinder(filtered_OB95_SCE, dbr = 0.067 , includePCs = 30,dbr.sd = 0)
+filtered_Chow64_SCE <- scDblFinder(filtered_Chow64_SCE, dbr = 0.127 , includePCs = 30,dbr.sd = 0)
+filtered_OB96_SCE <- scDblFinder(filtered_OB96_SCE, dbr = 0.063 , includePCs = 30,dbr.sd = 0)
+filtered_Chow79_SCE <- scDblFinder(filtered_Chow79_SCE, dbr = 0.082 , includePCs = 30,dbr.sd = 0)
+filtered_Chow82_SCE <- scDblFinder(filtered_Chow82_SCE, dbr = 0.114 , includePCs = 30,dbr.sd = 0)
+
+```
+
+#Assigning the scDbl score back to the Seurat Object
+```{r}
+filtered_OB100$scDblFinder.score <- filtered_OB100_SCE$scDblFinder.score
+filtered_OB98$scDblFinder.score <- filtered_OB98_SCE$scDblFinder.score
+filtered_Chow69$scDblFinder.score <- filtered_Chow69_SCE$scDblFinder.score
+filtered_Chow70$scDblFinder.score <- filtered_Chow70_SCE$scDblFinder.score
+filtered_OB83$scDblFinder.score <- filtered_OB83_SCE$scDblFinder.score
+filtered_OB95$scDblFinder.score <- filtered_OB95_SCE$scDblFinder.score
+filtered_Chow64$scDblFinder.score <- filtered_Chow64_SCE$scDblFinder.score
+filtered_OB96$scDblFinder.score <- filtered_OB96_SCE$scDblFinder.score
+filtered_Chow79$scDblFinder.score <- filtered_Chow79_SCE$scDblFinder.score
+filtered_Chow82$scDblFinder.score <- filtered_Chow82_SCE$scDblFinder.score
+
+```
+
+```{r}
+save(filtered_OB100, file = "~/Maternal_Obesity/objects/filtered_OB100_mt10_velo-scdbl_v5_upd.RData")
+save(filtered_OB98, file = "~/Maternal_Obesity/objects/filtered_OB98_mt10_velo-scdbl_v5_upd.RData")
+save(filtered_Chow69, file = "~/Maternal_Obesity/objects/filtered_Chow69_mt10_velo-scdbl_v5_upd.RData")
+save(filtered_Chow70, file = "~/Maternal_Obesity/objects/filtered_Chow70_mt10_velo-scdbl_v5_upd.RData")
+save(filtered_OB83, file = "~/Maternal_Obesity/objects/filtered_OB83_mt10_velo-scdbl_v5_upd.RData")
+save(filtered_OB95, file = "~/Maternal_Obesity/objects/filtered_OB95_mt10_velo-scdbl_v5_upd.RData")
+save(filtered_Chow64, file = "~/Maternal_Obesity/objects/filtered_Chow64_mt10_velo-scdbl_v5_upd.RData")
+save(filtered_OB96, file = "~/Maternal_Obesity/objects/filtered_OB96_mt10_velo-scdbl_v5_upd.RData")
+save(filtered_Chow79, file = "~/Maternal_Obesity/objects/filtered_Chow79_mt10_velo-scdbl_v5_upd.RData")
+save(filtered_Chow82, file = "~/Maternal_Obesity/objects/filtered_Chow82_mt10_velo-scdbl_v5_upd.RData")
+```
+
+#Assigning the scDbl class back to the Seurat Object
+```{r}
+filtered_OB100$scDblFinder.class <- filtered_OB100_SCE$scDblFinder.class
+filtered_OB98$scDblFinder.class <- filtered_OB98_SCE$scDblFinder.class
+filtered_Chow69$scDblFinder.class <- filtered_Chow69_SCE$scDblFinder.class
+filtered_Chow70$scDblFinder.class <- filtered_Chow70_SCE$scDblFinder.class
+filtered_OB83$scDblFinder.class <- filtered_OB83_SCE$scDblFinder.class
+filtered_OB95$scDblFinder.class <- filtered_OB95_SCE$scDblFinder.class
+filtered_Chow64$scDblFinder.class <- filtered_Chow64_SCE$scDblFinder.class
+filtered_OB96$scDblFinder.class <- filtered_OB96_SCE$scDblFinder.class
+filtered_Chow79$scDblFinder.class <- filtered_Chow79_SCE$scDblFinder.class
+filtered_Chow82$scDblFinder.class <- filtered_Chow82_SCE$scDblFinder.class
+
+```
+
+#Removing doublets based on the scDbl class 
+
+```{r}
+filtered_OB100 <- subset (filtered_OB100, subset = scDblFinder.class == 'singlet')
+
+filtered_OB98 <- subset (filtered_OB98, subset = scDblFinder.class == 'singlet')
+
+filtered_Chow69 <- subset (filtered_Chow69, subset = scDblFinder.class == 'singlet')
+
+filtered_Chow70 <- subset (filtered_Chow70, subset = scDblFinder.class == 'singlet')
+
+filtered_OB83 <- subset (filtered_OB83, subset = scDblFinder.class == 'singlet')
+
+filtered_OB95 <- subset (filtered_OB95, subset = scDblFinder.class == 'singlet')
+
+filtered_Chow64 <- subset (filtered_Chow64, subset = scDblFinder.class == 'singlet')
+
+filtered_OB96 <- subset (filtered_OB96, subset = scDblFinder.class == 'singlet')
+
+filtered_Chow79 <- subset (filtered_Chow79, subset = scDblFinder.class == 'singlet')
+
+filtered_Chow82 <- subset (filtered_Chow82, subset = scDblFinder.class == 'singlet')
+```
+
+
+#Removing unnecessary objects to save space
+```{r}
+rm(OB100)
+rm(OB98)
+rm(OB96)
+rm(OB95)
+rm(OB83)
+rm(Chow70)
+rm(Chow64)
+rm(Chow69)
+rm(Chow79)
+rm(Chow82)
+gc()
+```
+
+
+#Normalizing the samples
+```{r}
+filtered_OB100 <- NormalizeData(filtered_OB100)
+filtered_OB98 <- NormalizeData(filtered_OB98)
+filtered_Chow69 <- NormalizeData(filtered_Chow69)
+filtered_Chow70 <- NormalizeData(filtered_Chow70)
+filtered_OB83 <- NormalizeData(filtered_OB83)
+filtered_OB95 <- NormalizeData(filtered_OB95)
+filtered_Chow64 <- NormalizeData(filtered_Chow64)
+filtered_OB96 <- NormalizeData(filtered_OB96)
+filtered_Chow79 <- NormalizeData(filtered_Chow79)
+filtered_Chow82 <- NormalizeData(filtered_Chow82)
+
+```
+
+
+
+```{r}
+#Source : 
+#cc_file <- getURL("https://raw.githubusercontent.com/hbc/tinyatlas/master/cell_cycle/Mus_musculus.csv")
+
+s_genes <- read.csv("~/s.genes.csv")
+s.genes <- c(s_genes$x[1:43])
+
+g2m_genes <- read.csv(file = '~/g2m.genes.csv')
+g2m.genes <- c(g2m_genes$x[1:54])
+
+head(s.genes)
+head(g2m.genes)
+
+```
+
+#Cell cycle gene assessment
+```{r}
+
+filtered_OB100 <- CellCycleScoring   (filtered_OB100, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+filtered_OB98 <- CellCycleScoring   (filtered_OB98, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+filtered_Chow69 <- CellCycleScoring   (filtered_Chow69, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+filtered_Chow70 <- CellCycleScoring   (filtered_Chow70, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+filtered_OB83 <- CellCycleScoring   (filtered_OB83, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+filtered_OB95 <- CellCycleScoring   (filtered_OB95, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+filtered_Chow64 <- CellCycleScoring   (filtered_Chow64, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+filtered_OB96 <- CellCycleScoring   (filtered_OB96, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+filtered_Chow79 <- CellCycleScoring   (filtered_Chow79, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+filtered_Chow82 <- CellCycleScoring   (filtered_Chow82, s.features = s.genes, g2m.features = g2m.genes, set.ident = TRUE)
+
+```
+
+#Checking the spread of cells in different cell cycle states
+```{r}
+as_tibble(filtered_OB100[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+as_tibble(filtered_OB98[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+as_tibble(filtered_Chow69[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+as_tibble(filtered_Chow70[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+as_tibble(filtered_OB83[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+as_tibble(filtered_OB95[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+as_tibble(filtered_Chow64[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+as_tibble(filtered_OB96[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+as_tibble(filtered_Chow79[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+as_tibble(filtered_Chow82[[]]) %>%
+  ggplot(aes(Phase)) + geom_bar()
+
+
+as_tibble(filtered_Chow64[[]]) %>%
+  ggplot(aes(x=S.Score, y=G2M.Score, color=Phase)) + 
+  geom_point() +
+  coord_cartesian(xlim=c(-0.25,0.75), ylim=c(-0.25,1.3))
+```
+
+#Finding Variable Features
+```{r}
+filtered_OB100 <- FindVariableFeatures(filtered_OB100, selection.method = "vst", nfeatures = 2000)
+filtered_OB98 <- FindVariableFeatures(filtered_OB98, selection.method = "vst", nfeatures = 2000)
+filtered_Chow69 <- FindVariableFeatures(filtered_Chow69, selection.method = "vst", nfeatures = 2000)
+filtered_Chow70 <- FindVariableFeatures(filtered_Chow70, selection.method = "vst", nfeatures = 2000)
+filtered_OB83 <- FindVariableFeatures(filtered_OB83, selection.method = "vst", nfeatures = 2000)
+filtered_OB95 <- FindVariableFeatures(filtered_OB95, selection.method = "vst", nfeatures = 2000)
+filtered_Chow64 <- FindVariableFeatures(filtered_Chow64, selection.method = "vst", nfeatures = 2000)
+filtered_OB96 <- FindVariableFeatures(filtered_OB96, selection.method = "vst", nfeatures = 2000)
+filtered_Chow79 <- FindVariableFeatures(filtered_Chow79, selection.method = "vst", nfeatures = 2000)
+filtered_Chow82 <- FindVariableFeatures(filtered_Chow82, selection.method = "vst", nfeatures = 2000)
+```
+
+
+#Top 10 variable features and hypervariable genes, check for one sample
+```{r}
+as_tibble(HVFInfo(filtered_OB100),rownames = "Gene") -> variance.data
+
+variance.data %>% 
+  mutate(hypervariable=Gene %in% VariableFeatures(filtered_OB100)
+) -> variance.data
+
+head(variance.data, n=10)
+
+variance.data %>% 
+  ggplot(aes(log(mean),log(variance),color=hypervariable)) + 
+  geom_point() + 
+  scale_color_manual(values=c("black","red"))
+```
+
+#Scaling the expression of each gene for all data
+```{r}
+all.genes <- rownames(filtered_OB100)
+filtered_OB100 <- ScaleData(filtered_OB100, features = all.genes)
+
+all.genes <- rownames(filtered_OB98)
+filtered_OB98 <- ScaleData(filtered_OB98, features = all.genes)
+
+all.genes <- rownames(filtered_Chow69)
+filtered_Chow69 <- ScaleData(filtered_Chow69, features = all.genes)
+
+all.genes <- rownames(filtered_Chow70)
+filtered_Chow70 <- ScaleData(filtered_Chow70, features = all.genes)
+
+all.genes <- rownames(filtered_OB83)
+filtered_OB83 <- ScaleData(filtered_OB83, features = all.genes)
+
+all.genes <- rownames(filtered_OB95)
+filtered_OB95 <- ScaleData(filtered_OB95, features = all.genes)
+
+all.genes <- rownames(filtered_Chow64)
+filtered_Chow64 <- ScaleData(filtered_Chow64, features = all.genes)
+
+all.genes <- rownames(filtered_OB96)
+filtered_OB96 <- ScaleData(filtered_OB96, features = all.genes)
+
+all.genes <- rownames(filtered_Chow79)
+filtered_Chow79 <- ScaleData(filtered_Chow79, features = all.genes)
+
+all.genes <- rownames(filtered_Chow82)
+filtered_Chow82 <- ScaleData(filtered_Chow82, features = all.genes)
+```
+
+#PCA
+```{r}
+filtered_OB100 <- RunPCA(filtered_OB100)
+filtered_OB98 <- RunPCA(filtered_OB98)
+filtered_Chow69 <- RunPCA(filtered_Chow69)
+filtered_Chow70 <- RunPCA(filtered_Chow70)
+filtered_OB83 <- RunPCA(filtered_OB83)
+filtered_OB95 <- RunPCA(filtered_OB95)
+filtered_Chow64 <- RunPCA(filtered_Chow64)
+filtered_OB96 <- RunPCA(filtered_OB96)
+filtered_Chow79 <- RunPCA(filtered_Chow79)
+filtered_Chow82 <- RunPCA(filtered_Chow82)
+```
+
+#Elbowplots
+```{r}
+ElbowPlot(filtered_OB100, ndims=50) #PC50
+ElbowPlot(filtered_OB98, ndims=50) #PC50
+ElbowPlot(filtered_Chow69, ndims=50) #PC50
+ElbowPlot(filtered_Chow70, ndims=50) #PC50
+ElbowPlot(filtered_OB83, ndims=50) #PC50
+ElbowPlot(filtered_OB95, ndims=50) #PC50
+ElbowPlot(filtered_Chow64, ndims=50) #PC50
+ElbowPlot(filtered_OB96, ndims=50) #PC50
+ElbowPlot(filtered_Chow79, ndims=50) #PC50
+ElbowPlot(filtered_Chow82, ndims=50) #PC50
+```
+
+
+#UMAP
+```{r}
+filtered_OB100 <- RunUMAP(filtered_OB100, dims = 1:50)
+filtered_OB98 <- RunUMAP(filtered_OB98, dims = 1:50)
+filtered_Chow69 <- RunUMAP(filtered_Chow69, dims = 1:50)
+filtered_Chow70 <- RunUMAP(filtered_Chow70, dims = 1:50)
+filtered_OB83 <- RunUMAP(filtered_OB83, dims = 1:50)
+filtered_OB95 <- RunUMAP(filtered_OB95, dims = 1:50)
+filtered_Chow64 <- RunUMAP(filtered_Chow64, dims = 1:50)
+filtered_OB96 <- RunUMAP(filtered_OB96, dims = 1:50)
+filtered_Chow79 <- RunUMAP(filtered_Chow79, dims = 1:50)
+filtered_Chow82 <- RunUMAP(filtered_Chow82, dims = 1:50)
+```
+
+
+#Removing unnecessary files
+```{r}
+rm(all.genes)
+rm(file)
+rm(g2m_genes)
+rm(g2m.genes)
+rm(s.genes)
+rm(s_genes)
+rm(percent.ribo)
+rm(ribo.genes)
+rm(seurat_data)
+rm(seurat_obj)
+rm(variance.data)
+rm(qc.metrics)
+```
+
+
+
+#Violin Plots after QC
+```{r}
+VlnPlot(filtered_OB100, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+VlnPlot(filtered_OB98, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+VlnPlot(filtered_Chow70, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+VlnPlot(filtered_Chow69, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+VlnPlot(filtered_OB83, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+VlnPlot(filtered_OB95, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+VlnPlot(filtered_Chow64, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+VlnPlot(filtered_OB96, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+VlnPlot(filtered_Chow79, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+VlnPlot(filtered_Chow82, features = c("nFeature_RNA", "nCount_RNA", "percent.mt","percent.ribo"), group.by = "orig.ident", ncol = 4)
+```
+
+
+#Plotting the mitochondrial percentages in umap
+```{r}
+FeaturePlot(filtered_OB100, features = c("percent.mt"))
+FeaturePlot(filtered_OB98, features = c("percent.mt"))
+FeaturePlot(filtered_Chow69, features = c("percent.mt"))
+FeaturePlot(filtered_Chow70, features = c("percent.mt"))
+FeaturePlot(filtered_OB83, features = c("percent.mt"))
+FeaturePlot(filtered_OB95, features = c("percent.mt"))
+FeaturePlot(filtered_Chow64, features = c("percent.mt"))
+FeaturePlot(filtered_OB96, features = c("percent.mt"))
+FeaturePlot(filtered_Chow79, features = c("percent.mt"))
+FeaturePlot(filtered_Chow82, features = c("percent.mt"))
+```
+
+#Merging the samples
+```{r}
+maternal_merged <- merge (filtered_OB100, y = c(filtered_Chow69,
+                                               filtered_Chow70,
+                                               filtered_Chow64,
+                                               filtered_OB83,
+                                               filtered_OB95,
+                                               filtered_OB96,
+                                               filtered_OB98, 
+                                               filtered_Chow79,
+                                               filtered_Chow82),
+                        add.cell.ids  = c("OB100", "Chow69", "Chow70", "Chow64", "OB83", "OB95", "OB96","OB98","Chow79","Chow82"), 
+                        merge.data    = TRUE,
+                        project       = "10X_Maternal_Merged_Velocity")
+
+
+```
+
+#Removing unnecessary objects
+```{r}
+rm(filtered_OB100)
+rm(filtered_OB98)
+rm(filtered_OB96)
+rm(filtered_OB95)
+rm(filtered_OB83)
+rm(filtered_Chow70)
+rm(filtered_Chow64)
+rm(filtered_Chow69)
+rm(filtered_Chow79)
+rm(filtered_Chow82)
+```
+
+#Visualizing nFeature,nCount, mitochondrial percentage and ribosomal percentage of the merged object
+```{r}
+VlnPlot(maternal_merged,group.by = "orig.ident",features="nFeature_RNA")
+VlnPlot(maternal_merged,group.by = "orig.ident",features="nCount_RNA")
+VlnPlot(maternal_merged,group.by = "orig.ident",features="percent.mt")
+VlnPlot(maternal_merged,group.by = "orig.ident",features="percent.ribo")
+
+```
+
+#Visualizing cell cycle phases per sample
+```{r}
+maternal_merged@meta.data %>%
+  group_by(orig.ident,Phase) %>%
+  count() %>%
+  group_by(orig.ident) %>%
+  mutate(percent=100*n/sum(n)) %>%
+  ungroup() %>%
+  ggplot(aes(x=orig.ident,y=percent, fill=Phase)) +
+  geom_col() +
+  ggtitle("Percentage of cell cycle phases per sample")
+```
+
+#FeatureScatter for visualizing feature-feature relationships
+```{r}
+P1 <- FeatureScatter (object = maternal_merged, feature1 = "nCount_RNA", feature2 = "percent.mt"  ) + NoLegend()
+P2 <- FeatureScatter (object = maternal_merged, feature1 = "nCount_RNA", feature2 = "percent.ribo") + NoLegend()
+P3 <- FeatureScatter (object = maternal_merged, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + NoLegend()
+CombinePlots (plots = list (P1, P2, P3) )
+rm           (P1)
+rm           (P2)
+rm           (P3)
+```
+
+
+#Calculating the difference between the G2M and S phase scores to maintain signals separating non-cycling cells and cycling cells
+```{r}
+maternal_merged$CC.Difference <- maternal_merged$S.Score - maternal_merged$G2M.Score
+maternal_merged@meta.data
+```
+
+```{r}
+maternal_merged<- JoinLayers(maternal_merged)
+
+```
+
+
+# Integrate the data based on "Condition" 
+```{r}
+maternal_merged.list <- SplitObject (maternal_merged, split.by = "Condition")
+maternal_merged.list <- maternal_merged.list [ c("Maternal HFHS", "Maternal Chow") ]
+rm (maternal_merged)
+gc()
+```
+
+# Normalize the data and regress out variation resulting from the % MT, CC Difference, Batch, nFeature RNA, and nCount RNA variables
+```{r}
+for (i in 1:length(maternal_merged.list)) {
+maternal_merged.list[[i]] <- SCTransform (maternal_merged.list[[i]],
+                                          verbose         = FALSE,
+                                          vars.to.regress = c("CC.Difference"),
+                                          vst.flavor = "v2")
+                                          }
+```
+
+# Integrate the data
+
+```{r}
+options (future.globals.maxSize = 10000000000000000000000000000000)
+maternal_merged.features <- SelectIntegrationFeatures (object.list     = maternal_merged.list, nfeatures = 3000)
+maternal_merged.list     <- PrepSCTIntegration        (object.list     = maternal_merged.list,
+                                                     anchor.features = maternal_merged.features,
+                                                     verbose         = FALSE)
+``` 
+
+# Integrate the data (continued)
+
+```{r}
+maternal_merged.anchors <- FindIntegrationAnchors (object.list          = maternal_merged.list,
+                                                 normalization.method = "SCT",
+                                                 anchor.features      = maternal_merged.features,
+                                                 verbose              = FALSE)
+rm (maternal_merged.list)
+rm (maternal_merged.features)
+```
+
+# Integrate the data (continued)
+```{r}
+maternal_integrated <- IntegrateData (anchorset            = maternal_merged.anchors,
+                            normalization.method = "SCT",
+                            verbose              = FALSE)
+rm (maternal_merged.anchors)
+gc()
+```
+
+#Finding variable features
+```{r}
+maternal_integrated <- FindVariableFeatures(maternal_integrated, selection.method = "vst", nfeatures = 2000, assay = "RNA")
+top20 <- head(VariableFeatures(maternal_integrated), 20)
+
+LabelPoints(plot = VariableFeaturePlot(maternal_integrated), points = top20, repel = TRUE)
+```
+
+#PCA
+```{r}
+maternal_integrated <- RunPCA(maternal_integrated)
+ElbowPlot(maternal_integrated, ndims=50)
+
+```
+
+```{r}
+PCAPlot (maternal_integrated, group.by = "orig.ident")
+PCAPlot (maternal_integrated, group.by = "Condition")
+PCAPlot (maternal_integrated, group.by = "Batch")
+PCAPlot (maternal_integrated, group.by = "Phase")
+
+```
+
+# Clustering the merged dataset
+```{r}
+resolution.range <- seq (from = 0, to = 0.35, by = 0.01)
+maternal_integrated <- FindNeighbors (maternal_integrated, dims = 1:50)
+maternal_integrated <- FindClusters  (maternal_integrated, resolution = resolution.range)
+```
+
+
+
+# Selecting the cluster resolution
+```{r}
+clustree (maternal_integrated, prefix = "integrated_snn_res.")
+```
+
+# Reduce data dimensionality
+```{r}
+maternal_integrated <-FindNeighbors(maternal_integrated, dims = 1:50) 
+maternal_integrated <- FindClusters (maternal_integrated, resolution = 0.24) 
+maternal_integrated <- RunUMAP (maternal_integrated, n.neighbors = 5L, min.dist = 0.4,  dims = 1:50)
+
+```
+
+#Joining layers (Seurat v5)
+```{r}
+maternal_integrated<- JoinLayers(maternal_integrated)
+```
+
+#Assessing whether there are any batch effects
+```{r}
+DefaultAssay(maternal_integrated) <- "integrated"
+
+DimPlot(maternal_integrated, group.by='seurat_clusters', reduction='umap') +
+  ggtitle('seurat clusters') 
+
+DimPlot(maternal_integrated, group.by='Batch', reduction='umap') +
+  ggtitle('Sequencing Batch') 
+
+# Visualize the data by UMAP
+UMAPPlot     (object = maternal_integrated, label = TRUE, pt.size = 1)                      + NoLegend ()
+UMAPPlot     (object = maternal_integrated, label = TRUE, pt.size = 1, split.by = 'Batch')  + NoLegend ()
+UMAPPlot     (object = maternal_integrated, label = TRUE, pt.size = 1, split.by = 'Phase')  + NoLegend ()
+UMAPPlot     (object = maternal_integrated, label = TRUE, pt.size = 1, split.by = 'orig.ident')     + NoLegend ()
+UMAPPlot     (object = maternal_integrated, label = TRUE, pt.size = 1, split.by = 'Condition')  + NoLegend ()
+```
+# Visualize expression of QC metrics by UMAP
+
+```{r}
+FeaturePlot  (object = maternal_integrated, features = c("nFeature_RNA"), pt.size = 1, order = TRUE, cols = c("grey", "red"))
+FeaturePlot  (object = maternal_integrated, features = c("nCount_RNA"),   pt.size = 1, order = TRUE, cols = c("grey", "red"))
+FeaturePlot  (object = maternal_integrated, features = c("percent.mt"),   pt.size = 1, order = TRUE, cols = c("grey", "red"))
+FeaturePlot  (object = maternal_integrated, features = c("S.Score"),      pt.size = 1, order = TRUE, cols = c("grey", "red"))
+FeaturePlot  (object = maternal_integrated, features = c("G2M.Score"),    pt.size = 1, order = TRUE, cols = c("grey", "red"))
+```
+#FeatureScatter for visualizing feature-feature relationships
+```{r}
+P1 <- FeatureScatter (object = maternal_integrated, feature1 = "nCount_RNA", feature2 = "percent.mt"  ) + NoLegend()
+P2 <- FeatureScatter (object = maternal_integrated, feature1 = "nCount_RNA", feature2 = "percent.ribo") + NoLegend()
+P3 <- FeatureScatter (object = maternal_integrated, feature1 = "nCount_RNA", feature2 = "nFeature_RNA") + NoLegend()
+CombinePlots (plots = list (P1, P2, P3) )
+rm           (P1)
+rm           (P2)
+rm           (P3)
+```
+#FeatureScatter for visualizing feature-feature relationships
+```{r}
+P1 <- FeatureScatter (object = maternal_integrated, feature1 = "nCount_RNA", feature2 = "percent.mt" , group.by = "Condition" ) + NoLegend()
+P2 <- FeatureScatter (object = maternal_integrated, feature1 = "nCount_RNA", feature2 = "percent.ribo", group.by = "Condition" ) + NoLegend()
+P3 <- FeatureScatter (object = maternal_integrated, feature1 = "nCount_RNA", feature2 = "nFeature_RNA", group.by = "Condition" ) + NoLegend()
+CombinePlots (plots = list (P1, P2, P3) )
+rm           (P1)
+rm           (P2)
+rm           (P3)
+```
+
+#FeatureScatter for visualizing feature-feature relationships
+```{r}
+P1 <- FeatureScatter (object = maternal_integrated, feature1 = "nCount_RNA", feature2 = "percent.mt" , group.by = "orig.ident" ) + NoLegend()
+P2 <- FeatureScatter (object = maternal_integrated, feature1 = "nCount_RNA", feature2 = "percent.ribo", group.by = "orig.ident" ) + NoLegend()
+P3 <- FeatureScatter (object = maternal_integrated, feature1 = "nCount_RNA", feature2 = "nFeature_RNA", group.by = "orig.ident" ) + NoLegend()
+CombinePlots (plots = list (P1, P2, P3) )
+rm           (P1)
+rm           (P2)
+rm           (P3)
+```
+
+#FeatureScatter for visualizing feature-feature relationships
+```{r}
+P1 <- FeatureScatter (object = maternal_integrated, feature1 = "nFeature_RNA", feature2 = "percent.mt" , group.by = "orig.ident" ) + NoLegend()
+P2 <- FeatureScatter (object = maternal_integrated, feature1 = "nFeature_RNA", feature2 = "percent.ribo", group.by = "orig.ident" ) + NoLegend()
+P3 <- FeatureScatter (object = maternal_integrated, feature1 = "nFeature_RNA", feature2 = "nCount_RNA", group.by = "orig.ident" ) + NoLegend()
+CombinePlots (plots = list (P1, P2, P3) )
+rm           (P1)
+rm           (P2)
+rm           (P3)
+```
+
+#Cell number for each cluster
+```{r}
+md <- maternal_integrated@meta.data %>% as.data.table
+md[, .N, by = "seurat_clusters"]
+md[, .N, by = "Condition"]
+
+```
+
+
+#Table 2: Finding the markers / Cluster annotation
+```{r}
+DefaultAssay(maternal_integrated) <- "RNA"
+
+all_markers_maternal <- FindAllMarkers(maternal_integrated, only.pos = TRUE)
+
+DefaultAssay(maternal_integrated) <- "integrated"
+```
+
+#Renaming the clusters
+```{r}
+ new.cluster.ids <- c("S1", #ESCs
+                      "S2", #ESCs
+                      "NK", #NK Cells                      
+                      "S3", #ESCs    
+                      "Mφ", #Macrophages
+                      "S5", #ESCs
+                      "cDC2", #Conventional Dendritic Cells 2
+                      "S4", #ESCs 
+                      "cDC1", #Conventional Dendritic Cells 1
+                      "NK", #NK proliferating
+                      "Endo1", #Vascular Endothelial Cells                      
+                      "ILC-Like", #ILC-Like Cells        
+                      "Endo2", #Lymphatic Endothelial Cell
+                      "T", #T cells                      
+                      "Epi",#Glandular Epithelial Cells   
+                      "SMC", #Smooth Muscle Cells  
+                      "Meso") #Endometrial Ciliated Cells 
+names (new.cluster.ids)      <- levels       (maternal_integrated)
+maternal_integrated$seurat_clusters <- Idents       (maternal_integrated)
+maternal_integrated                 <- RenameIdents (maternal_integrated, new.cluster.ids)
+```
+
+
+```{r}
+maternal_integrated$celltype <- NA
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "0"))] <- "S1"
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "1"))] <- "S2"
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "2"))] <- "NK" 
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "3"))] <- "S3"
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "4"))] <- "Macro"
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "5"))] <- "S5"                  
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "6"))] <- "cDC2"                        
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "7"))] <- "S4"                        
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "8"))] <- "cDC1"                      
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "9"))] <- "NK"                      
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "10"))] <- "Endo1" 
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "11"))] <- "ILC-Like"                  
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "12"))] <- "Endo2"                   
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "13"))] <- "T"
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "14"))] <- "Epi"   
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "15"))] <- "SMC" 
+maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "16"))] <- "Meso"  
+```
+
+#Figure1E Integrated
+```{r}
+
+UMAPPlot     (object = maternal_integrated, label = F, pt.size = 3,
+          cols  = c( "S1" = '#1f77b4',
+"S2" = 'darkolivegreen4',
+"NK" = '#CC6677', 
+"S3" = '#ff7f0e', 
+"Mφ" = '#332395', 
+"S4"   = 'wheat4',                 
+"cDC2"  = 'mediumvioletred',                              
+"S4"    = '#8c564b',                     
+"cDC1"   = '#9467bd' ,                    
+"Endo1" = "slateblue1", 
+"ILC-Like" = 'cadetblue3' ,                   
+"Endo2" = "lightgoldenrod3",                   
+"T" = 'turquoise4', 
+"Epi"   = 'seagreen2', 
+"SMC" = "tomato3", 
+"Meso" = '#882255' ))  + NoLegend ()
+```
+
+#Figure1E Split Condition
+```{r}
+
+UMAPPlot     (object = maternal_integrated, label = F, pt.size = 3, split.by = 'Condition',
+          cols  = c( "S1" = '#1f77b4',
+"S2" = 'darkolivegreen4',
+#"NK" = '#e377c3', 
+"NK" = '#CC6677', 
+"S3" = '#ff7f0e', 
+"Mφ" = '#332395', 
+"S5"   = 'wheat4',                 
+"cDC2"  = 'mediumvioletred',                              
+"S4"    = '#8c564b',                     
+"cDC1"   = '#9467bd' ,                    
+"Endo1" = "slateblue1", 
+"ILC-Like" = 'cadetblue3' ,                   
+"Endo2" = "lightgoldenrod3",                   
+"T" = 'turquoise4', 
+"Epi"   = 'seagreen2', 
+"SMC" = "tomato3", 
+"Meso" = '#882255' ))  + NoLegend ()
+```
+
+#FigureS1C
+```{r}
+
+
+VlnPlot(maternal_integrated,group.by = "orig.ident", features = c("nFeature_RNA","nCount_RNA","percent.mt"), pt.size = 0, stack = T, raster = F, flip = T)+ NoLegend() +
+    geom_boxplot(width = 0.25, notch = FALSE, notchwidth = .4, outlier.shape = NA,  coef=0,show.legend=FALSE)
+
+
+```
+
+#FigureS1D
+```{r}
+markers.to.plot <- c("Hoxa10","Hoxa11","Hand2","Prlr","Nog","Dio3","Rrm2","Ogn","Fibin","Clec3b","Spon2","Hist1h1a","Acta2","Myh11","Pecam1","Mcam","Flt1","Prox1","Mmrn1","Epcam","Foxa2","Calb1","Upk3b","Lrrn4","Ptprc","Cd3e","Cxcr6","Nkg7","Eomes","Zbtb46","Cd209a","Xcr1","Clec9a","Cx3cr1","Adgre1","Ms4a7")
+
+my_levels <- c("S1", "S2", "S3", "S4", "S5","SMC", "Endo1", "Endo2",  "Epi", "Meso", "T", "NK", "ILC-Like",  "cDC1", "cDC2", "Mφ")
+
+my_levels <- rev(my_levels)
+
+maternal_integrated@active.ident <- factor (maternal_integrated@active.ident, levels = my_levels)
+
+DotPlot(maternal_integrated, features = markers.to.plot, assay = "RNA",
+         cols      = c("lightgrey", "red"), col.min   = 0, col.max   = 1, dot.min   = 0, dot.scale = 15) + RotatedAxis()
+
+```
+
+#Grouping Hand2+ Cells Together
+```{r}
+maternal_integrated$majorcelltype <- NA
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S1"))] <- "Hand2Pos"
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S2"))] <- "Hand2Pos"
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S3"))] <- "Hand2Pos" 
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S4"))] <- "Hand2Pos"
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S5"))] <- "Hand2Neg"
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "NK"))] <- "NK"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Macro"))] <- "Macro" 
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "T"))] <- "T"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "ILC-Like"))] <- "ILC-Like" 
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Epi"))] <- "Epi"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Meso"))] <- "Meso" 
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Endo1"))] <- "Endo1"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Endo2"))] <- "Endo2" 
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "SMC"))] <- "SMC"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "cDC1"))] <- "cDC1" 
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "cDC2"))] <- "cDC2"
+
+```
+
+#Subsetting Chow and HFHS from the integrated object
+```{r}
+Idents (maternal_integrated) <- maternal_integrated@meta.data$Condition
+
+
+maternal_con <- subset(x = maternal_integrated, idents = c("Maternal Chow"))
+maternal_hfhs <- subset(x = maternal_integrated, idents = c("Maternal HFHS"))
+
+Idents (maternal_integrated) <- maternal_integrated@meta.data$Condition
+Idents (maternal_con) <- maternal_con@meta.data$Condition
+Idents (maternal_hfhs) <- maternal_hfhs@meta.data$Condition
+
+```
+
+```{r}
+UMAPPlot     (object = maternal_integrated, label = TRUE, pt.size = 1, group.by = "majorcelltype")                      + NoLegend ()
+
+```
+
+#Cell number info for each cluster in Chow and HFHS
+```{r}
+md_con <- maternal_con@meta.data %>% as.data.table
+md_con[, .N, by = "majorcelltype"]
+md_con[, .N, by = "Condition"]
+```
+
+```{r}
+md_hfhs <- maternal_hfhs@meta.data %>% as.data.table
+md_hfhs[, .N, by = "majorcelltype"]
+md_hfhs[, .N, by = "Condition"]
+```
+
+```{r}
+# Create a dataframe
+df <- data.frame(
+  Condition = rep(c("Maternal Chow", "Maternal HFHS"), each = 13),
+  CellType = c(
+    "Hand2Pos", "NK", "Macro", "cDC1", "Hand2Neg", "Endo1", "T", "Endo2",
+    "SMC", "cDC2", "ILC-Like", "Epi", "Meso",
+    "cDC2", "Hand2Pos", "Macro", "Epi", "NK", "Endo2", "Endo1", "Hand2Neg",
+    "T", "ILC-Like", "cDC1", "Meso", "SMC"
+  ),
+  Frequency = c(
+    0.628650614, 0.140928597, 0.06475742, 0.017105734, 0.081922756,
+    0.008582668, 0.005751579, 0.005989987, 0.001311241, 0.034539278,
+    0.006437001, 0.002652283, 0.001370843,
+    0.044879231, 0.614595417, 0.085762895, 0.002887119, 0.127832341,
+    0.007372464, 0.009176913, 0.069033073, 0.006392906, 0.008712912,
+    0.020519166, 0.001366226, 0.001469337
+  )
+)
+
+# Function to generate a pie chart for each condition
+make_pie_chart <- function(df, condition_name) {
+  df_group <- df %>% filter(Condition == condition_name)
+  
+  ggplot(df_group, aes(x = "", y = Frequency, fill = CellType)) +
+    geom_bar(stat = "identity", width = 1, color = "white") +
+    coord_polar(theta = "y") +
+    labs(title = paste("Cell Type Proportions -", condition_name), fill = "Cell Type") +
+    theme_void() +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+      legend.position = "right"
+    )
+}
+
+p1 <- make_pie_chart(df, "Maternal Chow")
+p2 <- make_pie_chart(df, "Maternal HFHS")
+
+grid.arrange(p1, p2, ncol = 2)
+
+```
+
+#FigureS1E
+```{r}
+
+grid.arrange(p1, p2, ncol = 2)
+
+```
+
+
+
+```{r}
+Idents (maternal_integrated) <- maternal_integrated@meta.data$celltype
+
+maternal_majorsub <- subset(x = maternal_integrated, idents = c("S1","S2","S3","S4","S5","Mφ","NK"))
+
+```
+
+#FigureS1F
+```{r}
+cluster_var <- 'majorcelltype'
+clusters <- unique(maternal_majorsub@meta.data[[cluster_var]])
+clusters <- clusters[order(clusters)]
+df <- data.frame()
+for(i in 1:length(clusters)){
+  cur_df <- as.data.frame(maternal_majorsub@meta.data %>% subset(majorcelltype == clusters[i]) %>% .$orig.ident %>% table() /
+  table(maternal_majorsub$orig.ident))
+
+  cur_df$Freq <- cur_df$Freq * 1/(sum(cur_df$Freq))
+
+  cur_df$cluster <- clusters[i]
+  df <- rbind(df, cur_df)
+  print(i)
+}
+
+ggplot(df, aes(y=Freq, x=cluster, fill=.)) +
+  geom_bar(stat='identity') +
+  scale_y_continuous(expand = c(0,0)) +
+  ylab('Normalized proportion') +
+  ggtitle("Cell Frequencies") +
+  theme(legend.position  = "bottom",
+    legend.key = element_rect(fill = NA, color = NA),
+    panel.grid.major=element_blank(),
+    panel.grid.minor=element_blank(),
+    axis.text.x = element_text(angle=0, hjust=0.5,size = 25),
+    axis.title.x = element_blank(),
+    legend.title = element_blank(),
+    legend.text  = element_text(size  = 25),
+    axis.line.y = element_blank(),
+    axis.text.y = element_text(vjust = 0.5, size = 25),
+    axis.title.y = element_text(size = 25),
+    axis.line.x = element_blank(),
+    axis.text.y.right = element_text(size = 20),        
+    plot.title=element_text(size=40) #change font size of plot title
+    )
+```

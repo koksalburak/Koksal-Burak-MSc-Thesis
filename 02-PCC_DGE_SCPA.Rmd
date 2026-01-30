@@ -1,0 +1,1220 @@
+---
+title: "02-PCC, DGE and Pathways"
+output: html_document
+date: "2025-06-17"
+---
+
+```{r}
+library(Seurat)
+library(Matrix)
+library(SingleCellExperiment)
+library(tidyverse)
+library(scales)
+library(cowplot)
+library(dplyr)
+library(ggplot2)
+library(DoubletFinder)
+library(sctransform)
+library(ggraph)
+library(clustree)
+library(plotly)
+library(RCurl)
+library(harmony)
+library(biomaRt)
+library(AnnotationHub)
+library(ensembldb)
+library(shiny)
+library(scater)
+library(xlsx)
+library(DESeq2)
+library(ggrepel)
+library(ggpubr)
+library(enrichplot)
+library(openxlsx)
+library(clusterProfiler)
+library(DESeq2)
+library(ggrepel)
+library(ggpubr)
+library(brew)
+library(RColorBrewer)
+library(clusterProfiler)
+library(DOSE)
+library(pathview)
+library(org.Mm.eg.db)
+library(readxl)
+library(EnhancedVolcano)
+library(SCPA)
+library(magrittr)
+library(ComplexHeatmap)
+library(circlize)
+library(patchwork)
+```
+ 
+#Figure 2A - PCC
+```{r}
+maternal_integrated <- SetIdent(maternal_integrated, value = maternal_integrated@meta.data$Condition)
+av.exp <- AverageExpression(maternal_integrated)$RNA
+av.exp <-as.data.frame(av.exp)
+cor.exp <- cor(av.exp)
+cor.exp <-as.data.frame(cor.exp)
+
+cor.exp$x <- rownames(cor.exp)
+cor.df <- tidyr::gather(data = cor.exp, y, correlation, c("Maternal Chow","Maternal HFHS"))
+
+ggplot(cor.df, aes (x, y, fill = correlation)) +
+  geom_tile() +  geom_text(aes(label = round(correlation, 3)), color = "white", size = 22) +
+  scale_fill_gradientn(limits = c(0,1), colors = colorRampPalette(rev(brewer.pal(n=7, name = "RdYlBu"))) (100))+
+theme                (text         = element_text     (size  = 30)) + 
+theme                (axis.text    = element_text     (size  = 30)) + 
+theme                (axis.text.y  = element_text     (face  = "bold", hjust = 0.5, angle = 90), ) +
+theme                (axis.text.x  = element_text     (vjust = 0.5, hjust = 0.5, face = "bold", angle = 0)) + 
+theme                (legend.text  = element_text     (size  = 20)) +
+  NoLegend()
+
+
+```
+
+#Function for filtering DGE data
+
+```{r}
+filter_DGE <- function(data) {
+  # Ensure the required columns exist
+  if(!all(c("p_val_adj", "avg_log2FC") %in% colnames(data))) {
+    stop("Input data frame must contain 'p_val' and 'avg_log2FC' columns.")
+  }
+  
+  # Apply filtering conditions while keeping all columns
+  filtered_data <- data[data$p_val_adj < 0.05 & (data$avg_log2FC < -0.5 | data$avg_log2FC > 0.5), ]
+  
+  return(filtered_data)
+}
+```
+
+
+#Creating subset for each cell type
+```{r}
+maternal_stroma <- subset(x = maternal_integrated, idents = c("S1","S2","S3","S4"))
+maternal_hand2neg <- subset(x = maternal_integrated, idents = c("S5"))
+maternal_nk <- subset(x = maternal_integrated, idents = c("NK"))
+maternal_macro <- subset(x = maternal_integrated, idents = c("Mφ"))
+maternal_dc1 <- subset(x = maternal_integrated, idents = c("cDC1"))
+maternal_dc2 <- subset(x = maternal_integrated, idents = c("cDC2"))
+maternal_t <- subset(x = maternal_integrated, idents = c("T"))
+maternal_ilc <- subset(x = maternal_integrated, idents = c("ILC-Like"))
+maternal_epi <- subset(x = maternal_integrated, idents = c("Epi"))
+maternal_meso <- subset(x = maternal_integrated, idents = c("Meso"))
+maternal_endo1 <- subset(x = maternal_integrated, idents = c("Endo1"))
+maternal_endo2 <- subset(x = maternal_integrated, idents = c("Endo2"))
+maternal_smc <- subset(x = maternal_integrated, idents = c("SMC"))
+
+```
+
+
+#DGE - Figure2B, 2E and Table 3
+
+```{r}
+DefaultAssay(maternal_hand2neg) <- "RNA"
+Idents(maternal_hand2neg) <- "Condition"
+
+maternal_hand2neg.MAST <- FindMarkers(maternal_hand2neg, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_hand2neg.MAST_filtered <- filter_DGE(maternal_hand2neg.MAST)
+
+
+
+```
+
+```{r}
+DefaultAssay(maternal_stroma) <- "RNA"
+Idents(maternal_stroma) <- "Condition"
+
+maternal_hand2pos.MAST <- FindMarkers(maternal_stroma, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_hand2pos.MAST_filtered <- filter_DGE(maternal_hand2pos.MAST)
+
+
+```
+
+
+
+```{r}
+DefaultAssay(maternal_nk) <- "RNA"
+Idents(maternal_nk) <- "Condition"
+
+maternal_nk.MAST <- FindMarkers(maternal_nk, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_nk.MAST_filtered <- filter_DGE(maternal_nk.MAST)
+
+
+
+
+```
+
+
+
+```{r}
+DefaultAssay(maternal_macro) <- "RNA"
+Idents(maternal_macro) <- "Condition"
+
+maternal_macro.MAST <- FindMarkers(maternal_macro, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_macro.MAST_filtered <- filter_DGE(maternal_macro.MAST)
+
+
+
+
+```
+
+
+```{r}
+DefaultAssay(maternal_dc1) <- "RNA"
+Idents(maternal_dc1) <- "Condition"
+
+maternal_dc1.MAST <- FindMarkers(maternal_dc1, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_dc1.MAST_filtered <- filter_DGE(maternal_dc1.MAST)
+
+
+
+
+```
+
+```{r}
+DefaultAssay(maternal_dc2) <- "RNA"
+Idents(maternal_dc2) <- "Condition"
+
+maternal_dc2.MAST <- FindMarkers(maternal_dc2, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_dc2.MAST_filtered <- filter_DGE(maternal_dc2.MAST)
+
+
+
+
+```
+
+
+
+```{r}
+DefaultAssay(maternal_t) <- "RNA"
+Idents(maternal_t) <- "Condition"
+
+maternal_t.MAST <- FindMarkers(maternal_t, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_t.MAST_filtered <- filter_DGE(maternal_t.MAST)
+
+
+
+
+```
+
+
+
+```{r}
+DefaultAssay(maternal_ilc) <- "RNA"
+Idents(maternal_ilc) <- "Condition"
+
+maternal_ilc.MAST <- FindMarkers(maternal_ilc, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_ilc.MAST_filtered <- filter_DGE(maternal_ilc.MAST)
+
+
+
+
+```
+
+
+
+```{r}
+DefaultAssay(maternal_epi) <- "RNA"
+Idents(maternal_epi) <- "Condition"
+
+maternal_epi.MAST <- FindMarkers(maternal_epi, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_epi.MAST_filtered <- filter_DGE(maternal_epi.MAST)
+
+
+
+
+```
+
+
+
+```{r}
+DefaultAssay(maternal_meso) <- "RNA"
+Idents(maternal_meso) <- "Condition"
+
+maternal_meso.MAST <- FindMarkers(maternal_meso, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_meso.MAST_filtered <- filter_DGE(maternal_meso.MAST)
+
+
+
+
+```
+
+
+
+```{r}
+DefaultAssay(maternal_endo1) <- "RNA"
+Idents(maternal_endo1) <- "Condition"
+
+maternal_endo1.MAST <- FindMarkers(maternal_endo1, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_endo1.MAST_filtered <- filter_DGE(maternal_endo1.MAST)
+
+
+
+```
+
+
+```{r}
+DefaultAssay(maternal_endo2) <- "RNA"
+Idents(maternal_endo2) <- "Condition"
+
+maternal_endo2.MAST <- FindMarkers(maternal_endo2, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_endo2.MAST_filtered <- filter_DGE(maternal_endo2.MAST)
+
+
+
+
+```
+
+
+```{r}
+DefaultAssay(maternal_smc) <- "RNA"
+Idents(maternal_smc) <- "Condition"
+
+maternal_smc.MAST <- FindMarkers(maternal_smc, ident.1 = "Maternal HFHS", ident.2 = "Maternal Chow",   test.use = "MAST",
+                                  logfc.threshold    = 0.2,
+                                  min.pct            = -Inf,
+                                  min.diff.pct       = -Inf,
+                                  verbose            = FALSE)
+
+
+maternal_smc.MAST_filtered <- filter_DGE(maternal_smc.MAST)
+
+
+```
+
+
+#Figure 2C - Scatter Plots
+
+
+```{r}
+
+maternal_hand2pos.MAST$gene <- rownames(maternal_hand2pos.MAST)
+
+# Define thresholds
+logfc_threshold <- 0.4
+padj_threshold <- 0.05
+
+# Categorize genes
+maternal_hand2pos.MAST$group <- "None"
+maternal_hand2pos.MAST$group[maternal_hand2pos.MAST$avg_log2FC > logfc_threshold & maternal_hand2pos.MAST$p_val_adj < padj_threshold] <- "Up"
+maternal_hand2pos.MAST$group[maternal_hand2pos.MAST$avg_log2FC < -logfc_threshold & maternal_hand2pos.MAST$p_val_adj < padj_threshold] <- "Down"
+
+# Factor levels to control legend order
+maternal_hand2pos.MAST$group <- factor(maternal_hand2pos.MAST$group, levels = c("Up", "None", "Down"))
+
+# Counts for legend
+up_count_hand2pos <- sum(maternal_hand2pos.MAST$group == "Up")
+none_count_hand2pos <- sum(maternal_hand2pos.MAST$group == "None")
+down_count_hand2pos <- sum(maternal_hand2pos.MAST$group == "Down")
+```
+
+
+```{r}
+# Define the genes of interest
+highlight_genes_hand2pos <- c("Cd36", "Galnt15", "Adamts5", "Prlr", "Tagln", "Gsta3","Plk2","Chodl","Tsc22d3", "Hist1h4d", "Hist1h4e")
+
+# Filter for those genes
+genes_to_label_hand2pos <- maternal_hand2pos.MAST[rownames(maternal_hand2pos.MAST) %in% highlight_genes_hand2pos, ]
+
+genes_to_label_hand2pos$label_x <- genes_to_label_hand2pos$pct.1
+genes_to_label_hand2pos$label_y <- genes_to_label_hand2pos$pct.2
+```
+
+```{r}
+
+ggplot(maternal_hand2pos.MAST, aes(x = pct.1, y = pct.2, color = group))+
+  geom_point(
+    data = subset(maternal_hand2pos.MAST, group == "None"),
+    aes(x = pct.1, y = pct.2),
+    color = "grey", alpha = 1, size = 8
+  ) +
+  geom_point(
+    data = subset(maternal_hand2pos.MAST, group == "Up"),
+    aes(x = pct.1, y = pct.2),
+    color = "indianred", alpha = 1, size = 8
+  ) +
+  geom_point(
+    data = subset(maternal_hand2pos.MAST, group == "Down"),
+    aes(x = pct.1, y = pct.2),
+    color = "dodgerblue2", alpha = 1, size = 8
+  ) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "purple") +
+
+  # Connector lines
+  geom_segment(
+    data = genes_to_label_hand2pos,
+    aes(x = pct.1, y = pct.2, xend = label_x, yend = label_y),
+    inherit.aes = FALSE,
+    color = "black", size = 0.3
+  ) +
+
+  # Triangle markers
+  geom_point(
+    data = genes_to_label_hand2pos,
+    aes(x = label_x, y = label_y),
+    shape = 17, size = 2, color = "black",
+    inherit.aes = FALSE
+  ) +
+
+  # Repelled labels from triangle positions
+  geom_text_repel(
+    data = genes_to_label_hand2pos,
+    aes(x = label_x, y = label_y, label = rownames(genes_to_label_hand2pos)),
+    color = "black", size = 5,
+    min.segment.length = 0, force = 2, max.overlaps = Inf
+  ) +
+
+  scale_color_manual(
+    values = c("Up" = "indianred", "None" = "grey", "Down" = "dodgerblue2"),
+    labels = c(paste0("Up = ", up_count_hand2pos), paste0("None = ", none_count_hand2pos), paste0("Down = ", down_count_hand2pos))
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 16)
+  ) +
+  labs(
+    x = "Detection in HFHS (%)",
+    y = "Detection in Chow (%)",
+    title = "Hand2+ Cells – DGE Scatter"
+  )
+
+```
+
+
+
+
+
+```{r}
+
+maternal_hand2neg.MAST$gene <- rownames(maternal_hand2neg.MAST)
+
+# Define thresholds
+logfc_threshold <- 0.4
+padj_threshold <- 0.05
+
+# Categorize genes
+maternal_hand2neg.MAST$group <- "None"
+maternal_hand2neg.MAST$group[maternal_hand2neg.MAST$avg_log2FC > logfc_threshold & maternal_hand2neg.MAST$p_val_adj < padj_threshold] <- "Up"
+maternal_hand2neg.MAST$group[maternal_hand2neg.MAST$avg_log2FC < -logfc_threshold & maternal_hand2neg.MAST$p_val_adj < padj_threshold] <- "Down"
+
+# Factor levels to control legend order
+maternal_hand2neg.MAST$group <- factor(maternal_hand2neg.MAST$group, levels = c("Up", "None", "Down"))
+
+# Counts for legend
+up_count_hand2neg <- sum(maternal_hand2neg.MAST$group == "Up")
+none_count_hand2neg <- sum(maternal_hand2neg.MAST$group == "None")
+down_count_hand2neg <- sum(maternal_hand2neg.MAST$group == "Down")
+```
+
+
+```{r}
+# Define the genes of interest
+highlight_genes_hand2neg <- c("Angptl4", "Col11a1", "Igkc", "Lama2", "Pdgfrl","Sma", "Plk2", "Has1", "Hk2", "Dhcr24") 
+
+# Filter for those genes
+genes_to_label_hand2neg <- maternal_hand2neg.MAST[rownames(maternal_hand2neg.MAST) %in% highlight_genes_hand2neg, ]
+
+genes_to_label_hand2neg$label_x <- genes_to_label_hand2neg$pct.1
+genes_to_label_hand2neg$label_y <- genes_to_label_hand2neg$pct.2
+```
+
+```{r}
+
+
+ggplot(maternal_hand2neg.MAST, aes(x = pct.1, y = pct.2, color = group))+
+  geom_point(
+    data = subset(maternal_hand2neg.MAST, group == "None"),
+    aes(x = pct.1, y = pct.2),
+    color = "grey", alpha = 1, size = 8
+  ) +
+  geom_point(
+    data = subset(maternal_hand2neg.MAST, group == "Up"),
+    aes(x = pct.1, y = pct.2),
+    color = "indianred", alpha = 1, size = 8
+  ) +
+  geom_point(
+    data = subset(maternal_hand2neg.MAST, group == "Down"),
+    aes(x = pct.1, y = pct.2),
+    color = "dodgerblue2", alpha = 1, size = 8
+  ) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "purple") +
+
+  # Connector lines
+  geom_segment(
+    data = genes_to_label_hand2neg,
+    aes(x = pct.1, y = pct.2, xend = label_x, yend = label_y),
+    inherit.aes = FALSE,
+    color = "black", size = 0.3
+  ) +
+
+  # Triangle markers
+  geom_point(
+    data = genes_to_label_hand2neg,
+    aes(x = label_x, y = label_y),
+    shape = 17, size = 2, color = "black",
+    inherit.aes = FALSE
+  ) +
+
+  # Repelled labels from triangle positions
+  geom_text_repel(
+    data = genes_to_label_hand2neg,
+    aes(x = label_x, y = label_y, label = rownames(genes_to_label_hand2neg)),
+    color = "black", size = 5,
+    min.segment.length = 0, force = 2, max.overlaps = Inf
+  ) +
+
+  scale_color_manual(
+    values = c("Up" = "indianred", "None" = "grey", "Down" = "dodgerblue2"),
+    labels = c(paste0("Up = ", up_count_hand2neg), paste0("None = ", none_count_hand2neg), paste0("Down = ", down_count_hand2neg))
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 16)
+  ) +
+  labs(
+    x = "Detection in HFHS (%)",
+    y = "Detection in Chow (%)",
+    title = "Hand2- Cells – DGE Scatter"
+  )
+
+```
+
+
+
+
+```{r}
+
+maternal_nk.MAST$gene <- rownames(maternal_nk.MAST)
+
+# Define thresholds
+logfc_threshold <- 0.4
+padj_threshold <- 0.05
+
+# Categorize genes
+maternal_nk.MAST$group <- "None"
+maternal_nk.MAST$group[maternal_nk.MAST$avg_log2FC > logfc_threshold & maternal_nk.MAST$p_val_adj < padj_threshold] <- "Up"
+maternal_nk.MAST$group[maternal_nk.MAST$avg_log2FC < -logfc_threshold & maternal_nk.MAST$p_val_adj < padj_threshold] <- "Down"
+
+# Factor levels to control legend order
+maternal_nk.MAST$group <- factor(maternal_nk.MAST$group, levels = c("Up", "None", "Down"))
+
+# Counts for legend
+up_count_nk <- sum(maternal_nk.MAST$group == "Up")
+none_count_nk <- sum(maternal_nk.MAST$group == "None")
+down_count_nk <- sum(maternal_nk.MAST$group == "Down")
+```
+
+```{r}
+# Define the genes of interest 
+highlight_genes_nk <- c("Col1a1", "Col1a2", "Col3a1", "Dcn", "Ifitm2","Ifi27l2a", "Ifitm3","Camk2b", "Sorcs2", "Hk3")
+
+# Filter for those genes
+genes_to_label_nk <- maternal_nk.MAST[rownames(maternal_nk.MAST) %in% highlight_genes_nk, ]
+
+genes_to_label_nk$label_x <- genes_to_label_nk$pct.1
+genes_to_label_nk$label_y <- genes_to_label_nk$pct.2
+```
+
+```{r}
+
+
+ggplot(maternal_nk.MAST, aes(x = pct.1, y = pct.2, color = group))+
+  geom_point(
+    data = subset(maternal_nk.MAST, group == "None"),
+    aes(x = pct.1, y = pct.2),
+    color = "grey", alpha = 1, size = 8
+  ) +
+  geom_point(
+    data = subset(maternal_nk.MAST, group == "Up"),
+    aes(x = pct.1, y = pct.2),
+    color = "indianred", alpha = 1, size = 8
+  ) +
+  geom_point(
+    data = subset(maternal_nk.MAST, group == "Down"),
+    aes(x = pct.1, y = pct.2),
+    color = "dodgerblue2", alpha = 1, size = 8
+  ) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "purple") +
+
+  # Connector lines
+  geom_segment(
+    data = genes_to_label_nk,
+    aes(x = pct.1, y = pct.2, xend = label_x, yend = label_y),
+    inherit.aes = FALSE,
+    color = "black", size = 0.3
+  ) +
+
+  # Triangle markers
+  geom_point(
+    data = genes_to_label_nk,
+    aes(x = label_x, y = label_y),
+    shape = 17, size = 2, color = "black",
+    inherit.aes = FALSE
+  ) +
+
+  # Repelled labels from triangle positions
+  geom_text_repel(
+    data = genes_to_label_nk,
+    aes(x = label_x, y = label_y, label = rownames(genes_to_label_nk)),
+    color = "black", size = 5,
+    min.segment.length = 0, force = 2, max.overlaps = Inf
+  ) +
+
+  scale_color_manual(
+    values = c("Up" = "indianred", "None" = "grey", "Down" = "dodgerblue2"),
+    labels = c(paste0("Up = ", up_count_nk), paste0("None = ", none_count_nk), paste0("Down = ", down_count_nk))
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 16)
+  ) +
+  labs(
+    x = "Detection in HFHS (%)",
+    y = "Detection in Chow (%)",
+    title = "NK Cells – DGE Scatter"
+  )
+
+```
+
+
+
+```{r}
+
+maternal_macro.MAST$gene <- rownames(maternal_macro.MAST)
+
+# Define thresholds
+logfc_threshold <- 0.4
+padj_threshold <- 0.05
+
+# Categorize genes
+maternal_macro.MAST$group <- "None"
+maternal_macro.MAST$group[maternal_macro.MAST$avg_log2FC > logfc_threshold & maternal_macro.MAST$p_val_adj < padj_threshold] <- "Up"
+maternal_macro.MAST$group[maternal_macro.MAST$avg_log2FC < -logfc_threshold & maternal_macro.MAST$p_val_adj < padj_threshold] <- "Down"
+
+# Factor levels to control legend order
+maternal_macro.MAST$group <- factor(maternal_macro.MAST$group, levels = c("Up", "None", "Down"))
+
+# Counts for legend
+up_count_macro <- sum(maternal_macro.MAST$group == "Up")
+none_count_macro <- sum(maternal_macro.MAST$group == "None")
+down_count_macro <- sum(maternal_macro.MAST$group == "Down")
+```
+
+
+```{r}
+# Define the genes of interest 
+highlight_genes_macro <- c("Adam8", "Arg1", "Cd300e", "Cd33", "Col1a1", "Col1a2", "Col3a1", "Dcn", "Dok2", "Mmp14", "Spp1", "Sqle")
+
+genes_to_label_macro <- maternal_macro.MAST[rownames(maternal_macro.MAST) %in% highlight_genes_macro, ]
+
+genes_to_label_macro$label_x <- genes_to_label_macro$pct.1
+genes_to_label_macro$label_y <- genes_to_label_macro$pct.2
+```
+
+
+```{r}
+
+ggplot(maternal_macro.MAST, aes(x = pct.1, y = pct.2, color = group))+
+  geom_point(
+    data = subset(maternal_macro.MAST, group == "None"),
+    aes(x = pct.1, y = pct.2),
+    color = "grey", alpha = 1, size = 8
+  ) +
+  geom_point(
+    data = subset(maternal_macro.MAST, group == "Up"),
+    aes(x = pct.1, y = pct.2),
+    color = "indianred", alpha = 1, size = 8
+  ) +
+  geom_point(
+    data = subset(maternal_macro.MAST, group == "Down"),
+    aes(x = pct.1, y = pct.2),
+    color = "dodgerblue2", alpha = 1, size = 8
+  ) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "purple") +
+
+  # Connector lines
+  geom_segment(
+    data = genes_to_label_macro,
+    aes(x = pct.1, y = pct.2, xend = label_x, yend = label_y),
+    inherit.aes = FALSE,
+    color = "black", size = 0.3
+  ) +
+
+  # Triangle markers
+  geom_point(
+    data = genes_to_label_macro,
+    aes(x = label_x, y = label_y),
+    shape = 17, size = 2, color = "black",
+    inherit.aes = FALSE
+  ) +
+
+  # Repelled labels from triangle positions
+  geom_text_repel(
+    data = genes_to_label_macro,
+    aes(x = label_x, y = label_y, label = rownames(genes_to_label_macro)),
+    color = "black", size = 5,
+    min.segment.length = 0, force = 2, max.overlaps = Inf
+  ) +
+
+  scale_color_manual(
+    values = c("Up" = "indianred", "None" = "grey", "Down" = "dodgerblue2"),
+    labels = c(paste0("Up = ", up_count_macro), paste0("None = ", none_count_macro), paste0("Down = ", down_count_macro))
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top",
+    legend.title = element_blank(),
+    plot.title = element_text(hjust = 0.5, size = 16)
+  ) +
+  labs(
+    x = "Detection in HFHS (%)",
+    y = "Detection in Chow (%)",
+    title = "Macrophage Cells – DGE Scatter"
+  )
+
+```
+
+#Figure 2E and Table4 - SCPA
+
+
+#Overwriting SCPA compare_seurat function to include more cells to the comparison (default=500, change it to 3000)
+```{r}
+
+compare_seurat <- function(seurat_object,
+                           assay = "RNA",
+                           group1 = NULL,
+                           group1_population = NULL,
+                           group2 = NULL,
+                           group2_population = NULL,
+                           pathways,
+                           downsample = 3000,
+                           min_genes = 15,
+                           max_genes = 500,
+                           parallel = FALSE,
+                           cores = NULL) {
+
+  ## Pathways
+  if (class(pathways)[1] == "character") {
+    pathways <- get_paths(pathways)
+  }
+  path_names <- sapply(pathways, function(x) unique(x$Pathway))
+
+  ## Convert population to character vector
+  group1_population <- as.character(group1_population)
+
+  ## Seurat extract
+  if (is.null(group2)) {
+    samples <- list()
+    for (i in group1_population) {
+      samples[[i]] <- seurat_extract(seurat_object,
+                                     assay = assay,
+                                     meta1 = group1,
+                                     value_meta1 = i)
+    }
+  }
+
+  if (!is.null(group2)) {
+    samples <- list()
+    for (i in group1_population) {
+      samples[[i]] <- seurat_extract(seurat_object,
+                                     assay = assay,
+                                     meta1 = group1,
+                                     value_meta1 = i,
+                                     meta2 = group2,
+                                     value_meta2 = group2_population)
+    }
+  }
+
+  if (parallel == FALSE) {
+
+    mcm_output <- compare_pathways(samples = samples,
+                                   pathways = pathways,
+                                   downsample = downsample,
+                                   min_genes = min_genes,
+                                   max_genes = max_genes)
+
+  } else {
+
+    mcm_output <- compare_pathways(samples = samples,
+                                   pathways = pathways,
+                                   downsample = downsample,
+                                   min_genes = min_genes,
+                                   max_genes = max_genes,
+                                   parallel = TRUE,
+                                   cores = cores)
+
+  }
+
+
+  return(mcm_output)
+
+}
+```
+
+#Recluster Hand2+ subset for comparison
+
+```{r}
+
+DefaultAssay (maternal_stroma) <- "integrated"
+
+#redo find neighbours/clusters
+
+maternal_stroma <- FindNeighbors (maternal_stroma, dims = 1:30)
+maternal_stroma <- FindClusters  (maternal_stroma, resolution = 0.23, dims = 1:30)
+# Reduce decidual data dimensionality
+maternal_stroma <- RunUMAP       (maternal_stroma, reduction  = "pca", dims = 1:30)
+
+UMAPPlot     (object = maternal_stroma, label = TRUE, pt.size = 1)                      + NoLegend ()
+```
+
+
+#Download hallmark gene signatures from msigdbr
+
+```{r}
+pathway_names <- c("hallmark")
+hallmark_sets <- msigdbr("mouse") %>%
+  filter(grepl(paste(pathway_names, collapse = "|"), gs_name, ignore.case = T)) %>%
+  format_pathways()
+```
+
+#Perform SCPA for Hand2+ cells comparing diet for each subset
+```{r}
+#Comparing
+scpa_hand2pos_hallmark <- compare_seurat(maternal_stroma,
+              assay = "RNA",                          
+              group1 = "Condition",
+              group1_population = c("Maternal Chow", "Maternal HFHS"),  
+              group2 = "seurat_clusters",
+              group2_population = c("0","1","2","3","4"),
+              pathways = hallmark_sets,
+              parallel = TRUE, cores = 16)
+```
+
+
+
+```{r}
+scpa_hand2pos_hallmark <- scpa_hand2pos_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_hand2pos_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 2.6, shape = 21, fill = scpa_hand2pos_hallmark$color, stroke = 0.3) +
+ xlim(-8, 5) +
+ ylim(0, 10) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+```
+
+
+
+#Download hallmark gene signatures from msigdbr
+
+```{r}
+pathway_names <- c("hallmark")
+hallmark_sets <- msigdbr("mouse") %>%
+  filter(grepl(paste(pathway_names, collapse = "|"), gs_name, ignore.case = T)) %>%
+  format_pathways()
+```
+
+#Perform SCPA for Hand2- cells comparing diet
+```{r}
+#Comparing
+scpa_hand2neg_hallmark <- compare_seurat(maternal_hand2neg,
+              assay = "RNA",                          
+              group1 = "Condition",
+              group1_population = c("Maternal Chow", "Maternal HFHS"),  
+
+              pathways = hallmark_sets,
+              parallel = TRUE, cores = 16)
+```
+
+
+
+```{r}
+scpa_hand2neg_hallmark <- scpa_hand2neg_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+```
+
+
+
+#Download hallmark gene signatures from msigdbr
+
+```{r}
+pathway_names <- c("hallmark")
+hallmark_sets <- msigdbr("mouse") %>%
+  filter(grepl(paste(pathway_names, collapse = "|"), gs_name, ignore.case = T)) %>%
+  format_pathways()
+```
+
+#Perform SCPA for Macrophages comparing diet
+```{r}
+
+#Comparing
+scpa_macro_hallmark <- compare_seurat(maternal_macro,
+              assay = "RNA",                          
+              group1 = "Condition",
+              group1_population = c("Maternal Chow", "Maternal HFHS"),  
+
+              pathways = hallmark_sets,
+              parallel = TRUE, cores = 16)
+```
+
+
+
+```{r}
+scpa_macro_hallmark <- scpa_macro_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+
+```
+
+
+
+
+#Download hallmark gene signatures from msigdbr
+
+```{r}
+pathway_names <- c("hallmark")
+hallmark_sets <- msigdbr("mouse") %>%
+  filter(grepl(paste(pathway_names, collapse = "|"), gs_name, ignore.case = T)) %>%
+  format_pathways()
+```
+
+
+#Perform SCPA for NK cells comparing diet
+```{r}
+
+#Comparing
+scpa_nk_hallmark <- compare_seurat(maternal_nk,
+              assay = "RNA",                          
+              group1 = "Condition",
+              group1_population = c("Maternal Chow", "Maternal HFHS"),  
+
+              pathways = hallmark_sets,
+              parallel = TRUE, cores = 16)
+```
+
+
+
+```{r}
+scpa_nk_hallmark <- scpa_nk_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+
+```
+
+
+
+
+#Figure 2E plot SCPA outputs
+
+```{r}
+
+
+scpa_hand2pos_hallmark <- scpa_hand2pos_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_hand2pos_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 9.5, shape = 21, fill = scpa_hand2pos_hallmark$color, stroke = 0.3) +
+ xlim(-6, 5) +
+ ylim(0, 4) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+
+scpa_hand2neg_hallmark <- scpa_hand2neg_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_hand2neg_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 9.5, shape = 21, fill = scpa_hand2neg_hallmark$color, stroke = 0.3) +
+ xlim(-6, 6) +
+ ylim(0, 5) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+
+scpa_macro_hallmark <- scpa_macro_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_macro_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 9.5, shape = 21, fill = scpa_macro_hallmark$color, stroke = 0.3) +
+ xlim(-5, 7) +
+ ylim(0, 4) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+
+scpa_nk_hallmark <- scpa_nk_hallmark %>%
+ mutate(color = case_when(FC > 0.5 & adjPval < 0.01 ~ 'dodgerblue2',
+              FC < 0.5 & FC > -0.5 & adjPval < 0.01 ~ 'mediumseagreen',
+              FC < -0.5 & adjPval < 0.01 ~ 'indianred',
+              FC < 0.5 & FC > -0.5 & adjPval > 0.01 ~ 'black'))
+ggplot(scpa_nk_hallmark, aes(-FC, qval)) +
+ geom_vline(xintercept = c(-0.5, 0.5), linetype = "dashed", col = 'black', lwd = 0.3) +
+ geom_point(cex = 9.5, shape = 21, fill = scpa_nk_hallmark$color, stroke = 0.3) +
+ xlim(-1, 6) +
+ ylim(0, 4) +
+ xlab("Enrichment") +
+ ylab("Qval") +
+ theme(panel.background = element_blank(),
+    panel.border = element_rect(fill = NA),
+    aspect.ratio = 1)
+
+```
+
+
+#Figure S2A - DEG vs Cell Capture
+
+```{r}
+library(ggplot2)
+
+df <- data.frame(
+  cell_type = c("cDC1", "cDC2", "Endo1", "Endo2", "Epi", "Meso", "Hand2Neg", "Hand2Pos",
+                "ILC-Like", "Macro", "NK", "SMC", "T"),
+  num_DEGs = c(11, 162, 3, 4, 1, 0, 308, 2063, 10, 219, 307, 1, 4),
+  num_cells = c(1370, 2900, 644, 487, 201, 99, 5427, 44937, 554, 5500, 9688, 101, 441)
+)
+
+cell_colors <- c(
+  "cDC1" = '#9467bd',
+  "cDC2" = 'mediumvioletred',
+  "Endo1" = 'slateblue1',
+  "Endo2" = 'lightgoldenrod3',
+  "Epi" = 'seagreen2',
+  "Meso" = '#882255',
+  "Hand2Neg" = 'wheat4',
+  "Hand2Pos" = '#ffd42aff',
+  "ILC-Like" = 'cadetblue3',
+  "Macro" = '#332395',
+  "NK" = '#CC6677',
+  "SMC" = 'tomato3',
+  "T" = 'turquoise4'
+)
+
+model <- lm(num_DEGs ~ num_cells, data = df)
+r2 <- summary(model)$r.squared
+pval <- summary(model)$coefficients[2, 4]
+
+ggplot(df, aes(x = num_cells, y = num_DEGs, color = cell_type, label = cell_type)) +
+  geom_point(size = 10) +
+  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed") +
+  geom_text(vjust = -1, size = 3) +
+  scale_color_manual(values = cell_colors) +
+  annotate("text", 
+           x = max(df$num_cells) * 0.5, 
+           y = max(df$num_DEGs) * 0.9,
+           label = paste0("R² = ", round(r2, 3), 
+                          "\nP = ", signif(pval, 3)),
+           hjust = 0, size = 4) +
+  theme_minimal() +
+  labs(x = "Number of Cells", y = "Number of DEGs",
+       title = "Relationship between Number of Cells and DEGs per Cell Type")
+```
+
+#Figure S2B - SCPA Heatmap
+
+```{r}
+hand2pos_info_FC <- scpa_hand2pos_hallmark %>%
+  select(Pathway, hand2pos_FC = FC)
+hand2neg_info_FC <- scpa_hand2neg_hallmark %>%
+  select(Pathway, hand2neg_FC = FC)
+nk_info_FC <- scpa_nk_hallmark %>%
+  select(Pathway, nk_FC = FC)
+
+macro_info_FC <- scpa_macro_hallmark %>%
+  select(Pathway,  macro_FC = FC)
+
+
+#Full join all three on 'Pathway'
+joined_FC <- hand2pos_info_FC %>%
+  full_join(hand2neg_info_FC, by = "Pathway") %>%
+  full_join(nk_info_FC, by = "Pathway") %>%
+  full_join(macro_info_FC, by = "Pathway")%>%
+  column_to_rownames("Pathway")
+
+head(joined_FC)
+```
+
+
+
+
+```{r}
+  
+hand2pos_info_filtered <- hand2pos_info %>%
+  filter(abs(hand2pos_FC) > 0.5 & hand2pos_adjPval < 0.01)
+
+hand2neg_info_filtered <- hand2neg_info %>%
+  filter(abs(hand2neg_FC) > 0.5 & hand2neg_adjPval < 0.01)
+
+nk_info_filtered <- nk_info %>%
+  filter(abs(nk_FC) > 0.5 & nk_adjPval < 0.01)
+
+macro_info_filtered <- macro_info %>%
+  filter(abs(macro_FC) > 0.5 & macro_adjPval < 0.01)
+
+
+#Full join all three on 'Pathway'
+joined_info_filtered <- hand2pos_info_filtered %>%
+  full_join(hand2neg_info_filtered, by = "Pathway") %>%
+  full_join(nk_info_filtered, by = "Pathway") %>%
+  full_join(macro_info_filtered, by = "Pathway")
+
+#View result
+head(joined_info_filtered)
+
+```
+```{r}
+hallmark_select_paths <- c(rownames(joined_info_filtered))
+```
+
+```{r}
+position <- which(rownames(joined_FC) %in% hallmark_select_paths)
+row_an <- rowAnnotation(Genes = anno_mark(at = which(rownames(joined_FC) %in% hallmark_select_paths),
+                                          labels = rownames(joined_FC)[position],
+                                          labels_gp = gpar(fontsize = 7),
+                                          link_width = unit(2.5, "mm"),
+                                          padding = unit(1, "mm"),
+                                          link_gp = gpar(lwd = 0.5)))
+```
+
+
+
+```{r}
+
+filtered_info_FC <- joined_info_filtered %>%
+  select(Pathway, hand2pos_FC = hand2pos_FC, hand2neg_FC = hand2neg_FC,nk_FC = nk_FC,macro_FC = macro_FC)%>%
+  column_to_rownames("Pathway")
+```
+
+```{r}
+col_hm <- colorRamp2(colors = c("indianred", "white", "dodgerblue2"), breaks = c(-7, 0, 7))
+
+```
+
+
+```{r}
+
+Heatmap(joined_FC,
+        col = col_hm,
+        name = "FC",
+        show_row_names = F,
+        right_annotation = row_an,
+        column_names_gp = gpar(fontsize = 8),
+        border = T,
+        column_km = 3,
+        row_km = 3,
+        heatmap_legend_param = list(at = c(-7, 0, 7),
+    title = "FC",
+    color_bar = "continuous") ,
+        column_labels = c("Hand2pos","Hand2neg","NK","Macro"))
+
+```
+

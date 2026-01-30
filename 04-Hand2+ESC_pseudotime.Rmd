@@ -1,0 +1,959 @@
+---
+title: "04-Hand2+ESC Pseudotime"
+output: html_document
+date: "2025-06-18"
+---
+
+```{r, include = FALSE}
+library (Seurat)
+library (Matrix)
+library (dplyr)
+library (ggplot2)
+library (cowplot)
+library (tibble)
+library (readxl)
+library (fields)
+library (KernSmooth)
+library (ROCR)
+library (parallel)
+library (reshape2)
+library (pheatmap)
+library (monocle)
+library (limma)
+library(openxlsx)
+library(stringr)
+library(tradeSeq)
+library(ggplot2)
+library(ggbeeswarm)  
+library(patchwork) 
+library(slingshot)
+library(scran)
+library(scater)
+library(igraph)
+
+gc      ()
+```
+
+#Creating an RNA3 assay for monocle2 as Seurat v5 is not compatible with the vignette 
+
+```{r}
+maternal_stroma[["RNA3"]] <- as(object = maternal_stroma[["RNA"]], Class = "Assay")
+```
+
+
+```{r}
+DefaultAssay (maternal_stroma) <- "RNA3"
+maternal_stroma.monocle <- as.CellDataSet (maternal_stroma)
+```
+
+
+
+#Hand2+ ESC Integrated Object Monocle2 Analysis
+
+```{r}
+maternal_stroma.monocle <- estimateSizeFactors (maternal_stroma.monocle)
+maternal_stroma.monocle <- estimateDispersions (maternal_stroma.monocle)
+```
+
+```{r}
+maternal_stroma.monocle <- detectGenes (maternal_stroma.monocle, min_expr = 0.1)
+                  print       (head (fData (maternal_stroma.monocle)))
+```
+
+
+```{r}
+gc()
+```
+
+
+```{r}
+maternal_stroma.monocle_expressed_genes <- row.names (subset (fData (maternal_stroma.monocle), num_cells_expressed >= 10))
+```
+
+```{r}
+Sfrp4_id   <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Sfrp4"))
+Igfbp5_id  <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Igfbp5"))
+Sparc_id   <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Sparc"))
+Fst_id     <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Fst"))
+Mfap4_id   <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Mfap4"))
+Ogn_id     <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Ogn"))
+Fos_id     <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Fos"))
+
+Apoe_id    <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Apoe"))
+Inmt_id    <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Inmt"))
+Scara5_id  <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Scara5"))
+
+Ran_id     <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Ran"))
+Dio3_id    <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Dio3"))
+Id3_id     <- row.names (subset (fData (maternal_stroma.monocle), gene_short_name == "Id3"))
+```
+
+
+```{r}
+maternal_stroma.monocle.2  <- newCellTypeHierarchy ()
+
+maternal_stroma.monocle.2  <- addCellType (maternal_stroma.monocle.2,
+                                           "unStr",
+                                           classify_func = function (x) { x [Sfrp4_id,   ] >= 2.50 &
+                                                                          x [Igfbp5_id,  ] >= 3.00 &
+                                                                          x [Sparc_id,   ] >  3.75 &
+                                                                          x [Fst_id,     ] >  2.00 &
+                                                                          x [Ogn_id,     ] >  1.00 &
+                                                                          x [Mfap4_id,   ] >  1.00 &
+                                                                          x [Fos_id,     ] >  1.50  })
+
+maternal_stroma.monocle.2  <- addCellType (maternal_stroma.monocle.2,
+                                           "SDZ",
+                                           classify_func = function (x) { x [Apoe_id,    ] >= 1.50 &
+                                                                          x [Inmt_id,    ] >= 2.00 &
+                                                                          x [Scara5_id,  ] >= 1.00  })
+
+maternal_stroma.monocle.2  <- addCellType (maternal_stroma.monocle.2,
+                                           "PDZ",
+                                           classify_func = function (x) { x [Ran_id,     ] >= 2.00 &
+                                                                          x [Dio3_id,    ] >= 0.00 &
+                                                                          x [Id3_id,     ] >= 1.00                                                                                                      })
+
+
+
+maternal_stroma.monocle    <- classifyCells (maternal_stroma.monocle, maternal_stroma.monocle.2)
+
+
+```
+
+
+
+```{r}
+maternal_stroma_marker_diff <- markerDiffTable (maternal_stroma.monocle[maternal_stroma.monocle_expressed_genes, ],
+                                       maternal_stroma.monocle.2,
+                                       cores = 32)
+#rm (maternal_stroma)
+gc ()
+```
+
+```{r}
+maternal_stroma_semisup_clustering_genes <- row.names (maternal_stroma_marker_diff)[order (maternal_stroma_marker_diff$qval)][1:2550] 
+gc ()
+```
+ 
+```{r}
+maternal_stroma.monocle <- setOrderingFilter (maternal_stroma.monocle, maternal_stroma_semisup_clustering_genes)
+rm (maternal_stroma_semisup_clustering_genes)
+```
+
+```{r}
+maternal_stroma.monocle <- reduceDimension   (maternal_stroma.monocle,
+                                     max_components = 2,
+                                     method         = 'DDRTree',
+                                     norm_method    = 'none',
+                                     pseudo_expr    = 0)
+```
+
+
+
+```{r}
+maternal_stroma.monocle <- orderCells (maternal_stroma.monocle)
+gc ()
+```
+
+
+
+
+#Root State 4: Define the origin 
+```{r}
+maternal_stroma.monocle <- orderCells        (maternal_stroma.monocle, root_state = 4)
+
+```
+
+#Plot the trajectory
+
+```{r}
+plot_cell_trajectory (maternal_stroma.monocle, color_by = "seurat_clusters")
+plot_cell_trajectory (maternal_stroma.monocle, color_by = "Pseudotime")
+
+```
+
+#Figure 4A and Figure S4A
+
+```{r}
+plot_cell_trajectory (maternal_stroma.monocle,
+                      color_by           =   "seurat_clusters",
+                      cell_size          = 3,
+                      show_branch_points = FALSE)  
+plot_cell_trajectory (maternal_stroma.monocle,
+                      color_by           =   "Pseudotime",
+                      cell_size          = 3,
+                      show_branch_points = FALSE)  
+```
+
+
+```{r}
+maternal_stroma_BEAM_res <- BEAM (maternal_stroma.monocle,
+                         branch_point = 1,
+                         cores        = 32)
+
+maternal_stroma_BEAM_res <- maternal_stroma_BEAM_res [order (maternal_stroma_BEAM_res$qval), ]
+maternal_stroma_BEAM_res <- maternal_stroma_BEAM_res [ , c("gene_short_name", "pval", "qval")]
+
+
+
+```
+
+```{r}
+diff_test_res_statecond <- differentialGeneTest(maternal_stroma.monocle,
+                        fullModelFormulaStr = "~State + Condition",
+                        reducedModelFormulaStr = "~Condition" )
+
+diff_test_res_statecond <- diff_test_res_statecond [order (diff_test_res_statecond$qval), ]
+diff_test_res_statecond[,c("gene_short_name", "pval", "qval")]
+
+
+```
+
+
+```{r}
+Idents (maternal_stroma) <- maternal_stroma@meta.data$Condition
+
+maternal_stroma_chow <- subset(x = maternal_stroma, idents = c("Maternal Chow"))
+maternal_stroma_hfhs <- subset(x = maternal_stroma, idents = c("Maternal HFHS"))
+Idents (maternal_stroma) <- maternal_stroma@meta.data$seurat_clusters
+Idents (maternal_stroma_chow) <- maternal_stroma_chow@meta.data$seurat_clusters
+Idents (maternal_stroma_hfhs) <- maternal_stroma_hfhs@meta.data$seurat_clusters
+
+```
+
+
+#E5.5 Stroma Pseudotime
+
+```{r}
+
+DimPlot (object = maternal_stroma_chow, reduction = "umap", label = TRUE) + NoLegend ()
+DimPlot (object = maternal_stroma_chow, reduction = "umap", label = TRUE) + NoLegend ()
+
+```
+
+```{r}
+DefaultAssay (maternal_stroma_chow) <- "RNA3"
+maternal_stroma_chow.monocle <- as.CellDataSet (maternal_stroma_chow)
+```
+
+
+```{r}
+gc ()
+```
+
+#Hand2+ ESC Chow Object Monocle2 Analysis
+
+```{r}
+maternal_stroma_chow.monocle <- estimateSizeFactors (maternal_stroma_chow.monocle)
+maternal_stroma_chow.monocle <- estimateDispersions (maternal_stroma_chow.monocle)
+```
+
+```{r}
+maternal_stroma_chow.monocle <- detectGenes (maternal_stroma_chow.monocle, min_expr = 0.1)
+                  print       (head (fData (maternal_stroma_chow.monocle)))
+```
+
+```{r}
+VlnPlot (maternal_stroma_chow, features = c("Sfrp4"),  pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Igfbp5"), pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Sparc"),  pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Penk"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Fst"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Ogn"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Mfap4"),  pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Fos"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Rcn3"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Olfml3"), pt.size = 0, assay = "RNA3") + NoLegend ()
+
+VlnPlot (maternal_stroma_chow, features = c("Apoe"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Inmt"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Scara5"), pt.size = 0, assay = "RNA3") + NoLegend ()
+
+VlnPlot (maternal_stroma_chow, features = c("Ran"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Dio3"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_chow, features = c("Id3"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+```
+
+```{r}
+rm(maternal_stroma_chow)
+gc()
+```
+
+
+```{r}
+maternal_stroma_chow.monocle_expressed_genes <- row.names (subset (fData (maternal_stroma_chow.monocle), num_cells_expressed >= 10))
+```
+
+```{r}
+Sfrp4_id   <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Sfrp4"))
+Igfbp5_id  <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Igfbp5"))
+Sparc_id   <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Sparc"))
+Fst_id     <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Fst"))
+Mfap4_id   <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Mfap4"))
+Ogn_id     <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Ogn"))
+Fos_id     <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Fos"))
+
+Apoe_id    <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Apoe"))
+Inmt_id    <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Inmt"))
+Scara5_id  <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Scara5"))
+
+Ran_id     <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Ran"))
+Dio3_id    <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Dio3"))
+Id3_id     <- row.names (subset (fData (maternal_stroma_chow.monocle), gene_short_name == "Id3"))
+```
+
+```{r}
+maternal_stroma_chow.monocle.2  <- newCellTypeHierarchy ()
+
+maternal_stroma_chow.monocle.2  <- addCellType (maternal_stroma_chow.monocle.2,
+                                           "unStr",
+                                           classify_func = function (x) { x [Sfrp4_id,   ] >= 2.50 &
+                                                                          x [Igfbp5_id,  ] >= 3.00 &
+                                                                          x [Sparc_id,   ] >  3.75 &
+                                                                          x [Fst_id,     ] >  2.00 &
+                                                                          x [Ogn_id,     ] >  1.00 &
+                                                                          x [Mfap4_id,   ] >  1.00 &
+                                                                          x [Fos_id,     ] >  1.50  })
+
+maternal_stroma_chow.monocle.2  <- addCellType (maternal_stroma_chow.monocle.2,
+                                           "SDZ",
+                                           classify_func = function (x) { x [Apoe_id,    ] >= 1.50 &
+                                                                          x [Inmt_id,    ] >= 2.00 &
+                                                                          x [Scara5_id,  ] >= 1.00  })
+
+maternal_stroma_chow.monocle.2  <- addCellType (maternal_stroma_chow.monocle.2,
+                                           "PDZ",
+                                           classify_func = function (x) { x [Ran_id,     ] >= 2.00 &
+                                                                          x [Dio3_id,    ] >= 0.00 &
+                                                                          x [Id3_id,     ] >= 1.00                                                                                                      })
+
+maternal_stroma_chow.monocle    <- classifyCells (maternal_stroma_chow.monocle, maternal_stroma_chow.monocle.2)
+
+
+```
+
+```{r}
+maternal_stroma_chow_marker_diff <- markerDiffTable (maternal_stroma_chow.monocle[maternal_stroma_chow.monocle_expressed_genes, ],
+                                       maternal_stroma_chow.monocle.2,
+                                       cores = 32)
+
+
+gc ()
+```
+
+
+
+```{r}
+maternal_stroma_chow_semisup_clustering_genes <- row.names (maternal_stroma_chow_marker_diff)[order (maternal_stroma_chow_marker_diff$qval)][1:2850] 
+gc ()
+```
+ 
+```{r}
+maternal_stroma_chow.monocle <- setOrderingFilter (maternal_stroma_chow.monocle, maternal_stroma_chow_semisup_clustering_genes)
+rm (maternal_stroma_chow_semisup_clustering_genes)
+```
+
+```{r}
+maternal_stroma_chow.monocle <- reduceDimension   (maternal_stroma_chow.monocle,
+                                     max_components = 2,
+                                     method         = 'DDRTree',
+                                     norm_method    = 'none',
+                                     pseudo_expr    = 0)
+```
+
+
+
+```{r}
+maternal_stroma_chow.monocle <- orderCells (maternal_stroma_chow.monocle)
+gc ()
+```
+
+
+
+```{r}
+plot_cell_trajectory (maternal_stroma_chow.monocle, color_by = "seurat_clusters", show_cell_names = F)
+plot_cell_trajectory (maternal_stroma_chow.monocle, color_by = "Pseudotime",      show_cell_names = F)
+```
+
+
+
+```{r}
+maternal_stroma_chow.monocle <- orderCells (maternal_stroma_chow.monocle, root_state = 5 )
+gc ()
+```
+
+
+#E5.5 Stroma HFHS Pseudotime
+
+```{r}
+
+DimPlot (object = maternal_stroma_hfhs, reduction = "umap", label = TRUE) + NoLegend ()
+DimPlot (object = maternal_stroma_hfhs, reduction = "umap", label = TRUE) + NoLegend ()
+
+```
+
+```{r}
+DefaultAssay (maternal_stroma_hfhs) <- "RNA3"
+maternal_stroma_hfhs.monocle <- as.CellDataSet (maternal_stroma_hfhs)
+```
+
+
+```{r}
+gc ()
+```
+
+
+#Hand2+ ESC HFHS Object Monocle2 Analysis
+
+```{r}
+maternal_stroma_hfhs.monocle <- estimateSizeFactors (maternal_stroma_hfhs.monocle)
+maternal_stroma_hfhs.monocle <- estimateDispersions (maternal_stroma_hfhs.monocle)
+```
+
+```{r}
+maternal_stroma_hfhs.monocle <- detectGenes (maternal_stroma_hfhs.monocle, min_expr = 0.1)
+                  print       (head (fData (maternal_stroma_hfhs.monocle)))
+```
+
+```{r}
+VlnPlot (maternal_stroma_hfhs, features = c("Sfrp4"),  pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Igfbp5"), pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Sparc"),  pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Penk"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Fst"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Ogn"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Mfap4"),  pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Fos"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Rcn3"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Olfml3"), pt.size = 0, assay = "RNA3") + NoLegend ()
+
+VlnPlot (maternal_stroma_hfhs, features = c("Apoe"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Inmt"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Scara5"), pt.size = 0, assay = "RNA3") + NoLegend ()
+
+VlnPlot (maternal_stroma_hfhs, features = c("Ran"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Dio3"),   pt.size = 0, assay = "RNA3") + NoLegend ()
+VlnPlot (maternal_stroma_hfhs, features = c("Id3"),    pt.size = 0, assay = "RNA3") + NoLegend ()
+```
+
+```{r}
+rm(maternal_stroma_hfhs)
+gc()
+```
+
+
+```{r}
+maternal_stroma_hfhs.monocle_expressed_genes <- row.names (subset (fData (maternal_stroma_hfhs.monocle), num_cells_expressed >= 10))
+```
+
+```{r}
+Sfrp4_id   <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Sfrp4"))
+Igfbp5_id  <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Igfbp5"))
+Sparc_id   <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Sparc"))
+Fst_id     <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Fst"))
+Mfap4_id   <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Mfap4"))
+Ogn_id     <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Ogn"))
+Fos_id     <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Fos"))
+
+Apoe_id    <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Apoe"))
+Inmt_id    <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Inmt"))
+Scara5_id  <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Scara5"))
+
+Ran_id     <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Ran"))
+Dio3_id    <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Dio3"))
+Id3_id     <- row.names (subset (fData (maternal_stroma_hfhs.monocle), gene_short_name == "Id3"))
+```
+
+```{r}
+maternal_stroma_hfhs.monocle.2  <- newCellTypeHierarchy ()
+
+maternal_stroma_hfhs.monocle.2  <- addCellType (maternal_stroma_hfhs.monocle.2,
+                                           "unStr",
+                                           classify_func = function (x) { x [Sfrp4_id,   ] >= 2.50 &
+                                                                          x [Igfbp5_id,  ] >= 3.00 &
+                                                                          x [Sparc_id,   ] >  3.75 &
+                                                                          x [Fst_id,     ] >  2.00 &
+                                                                          x [Ogn_id,     ] >  1.00 &
+                                                                          x [Mfap4_id,   ] >  1.00 &
+                                                                          x [Fos_id,     ] >  1.50  })
+
+maternal_stroma_hfhs.monocle.2  <- addCellType (maternal_stroma_hfhs.monocle.2,
+                                           "SDZ",
+                                           classify_func = function (x) { x [Apoe_id,    ] >= 1.50 &
+                                                                          x [Inmt_id,    ] >= 2.00 &
+                                                                          x [Scara5_id,  ] >= 1.00  })
+
+maternal_stroma_hfhs.monocle.2  <- addCellType (maternal_stroma_hfhs.monocle.2,
+                                           "PDZ",
+                                           classify_func = function (x) { x [Ran_id,     ] >= 2.00 &
+                                                                          x [Dio3_id,    ] >= 0.00 &
+                                                                          x [Id3_id,     ] >= 1.00                                                                                                      })
+
+maternal_stroma_hfhs.monocle    <- classifyCells (maternal_stroma_hfhs.monocle, maternal_stroma_hfhs.monocle.2)
+
+
+```
+
+```{r}
+maternal_stroma_hfhs_marker_diff <- markerDiffTable (maternal_stroma_hfhs.monocle[maternal_stroma_hfhs.monocle_expressed_genes, ],
+                                       maternal_stroma_hfhs.monocle.2,
+                                       cores = 32)
+
+
+gc ()
+```
+
+
+```{r}
+maternal_stroma_hfhs_semisup_clustering_genes <- row.names (maternal_stroma_hfhs_marker_diff)[order (maternal_stroma_hfhs_marker_diff$qval)][1:2950] 
+gc ()
+```
+ 
+```{r}
+maternal_stroma_hfhs.monocle <- setOrderingFilter (maternal_stroma_hfhs.monocle, maternal_stroma_hfhs_semisup_clustering_genes)
+rm (maternal_stroma_hfhs_semisup_clustering_genes)
+```
+
+```{r}
+maternal_stroma_hfhs.monocle <- reduceDimension   (maternal_stroma_hfhs.monocle,
+                                     max_components = 2,
+                                     method         = 'DDRTree',
+                                     norm_method    = 'none',
+                                     pseudo_expr    = 0)
+```
+
+
+
+```{r}
+maternal_stroma_hfhs.monocle <- orderCells (maternal_stroma_hfhs.monocle)
+gc ()
+```
+
+
+
+```{r}
+plot_cell_trajectory (maternal_stroma_hfhs.monocle, color_by = "seurat_clusters", show_cell_names = F)
+plot_cell_trajectory (maternal_stroma_hfhs.monocle, color_by = "Pseudotime",      show_cell_names = F)
+```
+
+
+#Figure 4B 
+```{r}
+plot_cell_trajectory (maternal_stroma_chow.monocle,
+                      color_by           =   "seurat_clusters",
+                      cell_size          = 3,
+                      show_branch_points = FALSE)  
+plot_cell_trajectory (maternal_stroma_chow.monocle,
+                      color_by           =   "Pseudotime",
+                      cell_size          = 3,
+                      show_branch_points = FALSE)  
+plot_cell_trajectory (maternal_stroma_hfhs.monocle,
+                      color_by           =   "seurat_clusters",
+                      cell_size          = 3,
+                      show_branch_points = FALSE)  
+plot_cell_trajectory (maternal_stroma_hfhs.monocle,
+                      color_by           =   "Pseudotime",
+                      cell_size          = 3,
+                      show_branch_points = FALSE)  
+```
+
+
+
+
+```{r}
+maternal_stroma_hfhs.monocle <- orderCells (maternal_stroma_hfhs.monocle, root_state = 5 )
+gc ()
+```
+
+
+#Figure 4C analyses
+
+```{r}
+maternal_stroma_chow_BEAM_res <- BEAM (maternal_stroma_chow.monocle,
+                         branch_point = 2,
+                         cores        = 32)
+
+maternal_stroma_chow_BEAM_res <- maternal_stroma_chow_BEAM_res [order (maternal_stroma_chow_BEAM_res$qval), ]
+maternal_stroma_chow_BEAM_res <- maternal_stroma_chow_BEAM_res [ , c("gene_short_name", "pval", "qval")]
+
+
+write.xlsx(maternal_stroma_chow_BEAM_res, 
+          file = "~/maternal_stroma_chow_BEAM.xlsx", colNames = T, rowNames = T)
+
+```
+
+
+
+```{r}
+maternal_stroma_hfhs_BEAM_res <- BEAM (maternal_stroma_hfhs.monocle,
+                         branch_point = 1,
+                         cores        = 32)
+
+maternal_stroma_hfhs_BEAM_res <- maternal_stroma_hfhs_BEAM_res [order (maternal_stroma_hfhs_BEAM_res$qval), ]
+maternal_stroma_hfhs_BEAM_res <- maternal_stroma_hfhs_BEAM_res [ , c("gene_short_name", "pval", "qval")]
+
+
+write.xlsx(maternal_stroma_hfhs_BEAM_res, 
+          file = "~/maternal_stroma_hfhs_BEAM.xlsx", colNames = T, rowNames = T)
+
+```
+
+
+```{r}
+diff_test_res_pseudocond <- differentialGeneTest(maternal_stroma.monocle,
+                        fullModelFormulaStr = "~Pseudotime + Condition",
+                        reducedModelFormulaStr = "~Condition" )
+
+diff_test_res_pseudocond <- diff_test_res_pseudocond [order (diff_test_res_pseudocond$qval), ]
+diff_test_res_pseudocond[,c("gene_short_name", "pval", "qval")]
+
+
+
+
+write.xlsx(diff_test_res_pseudocond, 
+          file = "~/maternal_stroma_diff_test_res_pseudocond.xlsx", colNames = T, rowNames = T)
+```
+
+
+#Figure 4C - branched heatmap
+
+```{r}
+#List is curated from diff_test_res_pseudocond results and some canonial markers were added to define origin and endpoints
+
+top_targets <- c("Fmod", "Vim", "Sfrp4", "Dio3", "Id1", "Ran", "Mef2a", "Rb1cc1", "Map2", "Plscr2", "Cxcl9", "Pmepa1", "Atf3", "Lrrc7", "Vkorc1", "Erlec1", "Pld3", "Srgn", "Actb", "Igfbp2", "Klf5", "Tgfb2", "Wnt4", "Gata3", "Anp32a", "Dbi", "Romo1", "Id3", "Etfa", "Alpl", "Skp1a", "Rprm", "Ilf3", "Bdnf", "Unc13c", "Mt1", "Fus", "Des", "Il13ra2", "Foxp1", "Lamp2", "Bok", "Magi1", "Thy1", "Angpt2", "Kitl", "Nos1")
+
+
+```
+
+```{r}
+
+plot_genes_branched_heatmap(maternal_stroma_chow.monocle[top_targets],
+                                          branch_point = 2,
+                                          num_clusters = 4,
+                                          cores = 32,
+                                          use_gene_short_name = T,
+                                          show_rownames = T)
+
+plot_genes_branched_heatmap(maternal_stroma_hfhs.monocle[top_targets],
+                                          branch_point = 1,
+                                          num_clusters = 4,
+                                          cores = 32,
+                                          use_gene_short_name = T,
+                                          show_rownames = T)
+```
+
+
+#Monocle3 analysis
+
+#Find the root cell from monocle2 object
+```{r}
+maternal_stroma.monocle@phenoData@data[["Pseudotime"]]
+
+traj.coord<- maternal_stroma.monocle@phenoData@data[["Pseudotime"]]
+names(traj.coord) <- colnames(maternal_stroma.monocle)
+traj.coord <- as.data.frame(traj.coord)
+traj.coord<- as.data.frame(maternal_stroma.monocle@phenoData@data[["Pseudotime"]])
+
+# It is Chow82_TCATGGACATTCGATG-1
+```
+
+```{r}
+maternal_stroma.monocle3 <- as.cell_data_set      (maternal_stroma, assay = "RNA")
+maternal_stroma.monocle3 <- estimate_size_factors (maternal_stroma.monocle3)
+
+```
+
+```{r}
+maternal_stroma.monocle3 <- cluster_cells(maternal_stroma.monocle3)
+plot_cells(maternal_stroma.monocle3, color_cells_by = "partition")
+```
+
+
+
+```{r}
+maternal_stroma.monocle3 <- cluster_cells         (maternal_stroma.monocle3,
+                                       reduction_method = c("UMAP"),
+                                       cluster_method   = "leiden",
+                                       partition_qval   = 0.05,
+                                       resolution       = 0.000031)
+
+
+p1  <- plot_cells (maternal_stroma.monocle3,                               show_trajectory_graph = FALSE)
+p2  <- plot_cells (maternal_stroma.monocle3, color_cells_by = "partition", show_trajectory_graph = FALSE)
+wrap_plots        (p1, p2)
+```
+
+
+
+```{r}
+maternal_stroma.monocle3 <- learn_graph (maternal_stroma.monocle3)
+
+```
+
+```{r}
+maternal_stroma.monocle3 <- order_cells (maternal_stroma.monocle3,root_cells = ("Chow82_TCATGGACATTCGATG-1") )
+```
+
+#Figure S4B
+```{r}
+
+plot_cells (maternal_stroma.monocle3,
+            color_cells_by                = "pseudotime",
+            label_cell_groups             = FALSE,
+            label_leaves                  = FALSE,
+            label_branch_points           = FALSE,
+            graph_label_size              = 5,
+            cell_size                     = 5,
+            trajectory_graph_color        = "white",
+            trajectory_graph_segment_size = 1.25)
+```
+
+
+#Figure S4C and S4D - Screenshots from the 3D object 
+
+```{r}
+maternal_stroma.monocle3 <- preprocess_cds(maternal_stroma.monocle3,method = "PCA", num_dim = 30)
+
+maternal_stroma.monocle3_3d <- reduce_dimension(maternal_stroma.monocle3, max_components = 3)
+maternal_stroma.monocle3_3d <- cluster_cells(maternal_stroma.monocle3_3d)
+maternal_stroma.monocle3_3d <- learn_graph(maternal_stroma.monocle3_3d)
+maternal_stroma.monocle3_3d <- order_cells(maternal_stroma.monocle3_3d,root_cells = ("Chow82_TCATGGACATTCGATG-1"))
+
+maternal_stroma.monocle3_3d_plot_obj <- plot_cells_3d(maternal_stroma.monocle3_3d, color_cells_by="partition")
+
+plot_cells_3d(maternal_stroma.monocle3_3d, color_cells_by="strsubset", color_palette = c("#F8766D","#B79F00","#00C08B","#00B4F0","#F564E3"))
+```
+
+#Slingshot analysis
+```{r}
+maternal_stroma$stromatype <- NA
+maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str0"))] <- "udStr"
+maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str1"))] <- "SDZ1"
+maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str2"))] <- "SDZ2" 
+maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str3"))] <- "PDZ1"
+maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str4"))] <- "PDZ2"
+
+UMAPPlot     (object = maternal_stroma, label = TRUE, pt.size = 1, group.by = "stromatype")                      + NoLegend ()
+
+```
+
+```{r}
+Idents(maternal_stroma) <- "stromatype"
+
+```
+
+
+```{r}
+set.seed(1)
+lineages <- getLineages(data = dimred, clusterLabels = clustering)
+
+lineages
+```
+
+
+
+
+```{r}
+         maternal_stroma.sce                  <- as.SingleCellExperiment (maternal_stroma, assay = "RNA")
+colData (maternal_stroma.sce)$stromatype <- as.character            (maternal_stroma@active.ident) # from factor to character                 
+```
+
+```{r}
+         maternal_stroma.sce                  <- slingshot               (maternal_stroma.sce,
+                                                                       clusterLabels = 'stromatype',
+                                                                       reducedDim    = 'UMAP',
+                                                                       start.clus    = 'udStr',
+                                                                       end.clus      = c('PDZ2', 'SDZ2'),
+                                                                       stretch       = 0,
+                                                                       extend        = 'n',
+                                                                       omega         = TRUE)
+
+```
+```{r}
+colors   <- colorRampPalette (brewer.pal (11, 'Spectral') [-6]) (100)
+plotcol1 <- colors [cut (slingPseudotime (maternal_stroma.sce, na = FALSE) [ , 1], breaks = 100) ]
+plotcol2 <- colors [cut (slingPseudotime (maternal_stroma.sce, na = FALSE) [ , 2], breaks = 100) ]
+plot  (reducedDims      (maternal_stroma.sce)$UMAP,  col = plotcol1, pch  = 16,       asp = 1)                       
+lines (SlingshotDataSet (maternal_stroma.sce),       lwd = 2,       type = 'lineage', col = 'black', show.constraints = TRUE)
+plot  (reducedDims      (maternal_stroma.sce)$UMAP,  col = plotcol2, pch  = 16,       asp = 1)                       
+lines (SlingshotDataSet (maternal_stroma.sce),       lwd = 2,       type = 'lineage', col = 'black', show.constraints = TRUE)
+
+summary (maternal_stroma.sce$slingPseudotime_1)
+summary (maternal_stroma.sce$slingPseudotime_2)
+```
+
+```{r}
+maternal_stroma_pdz <- subset(x = maternal_stroma ,subset = stromatype == c("udStr","PDZ1","PDZ2"))
+Idents(maternal_stroma_pdz) <- "stromatype"
+
+```
+
+```{r}
+         maternal_stroma_pdz.sce                  <- as.SingleCellExperiment (maternal_stroma_pdz, assay = "RNA")
+
+colData (maternal_stroma_pdz.sce)$stromatype <- as.character            (maternal_stroma_pdz@active.ident) # from factor to character                 
+```
+
+
+```{r}
+         maternal_stroma_pdz.sce                  <- slingshot               (maternal_stroma_pdz.sce,
+                                                                       clusterLabels = 'stromatype',
+                                                                       reducedDim    = 'UMAP',
+                                                                       start.clus    = 'udStr',
+                                                                       end.clus      = c('PDZ2'),
+                                                                       stretch       = 0,
+                                                                       extend        = 'n',
+                                                                       omega         = TRUE)
+```
+
+
+```{r}
+maternal_stroma_sdz <- subset(x = maternal_stroma ,subset = stromatype == c("udStr","SDZ1","SDZ2"))
+Idents(maternal_stroma_sdz) <- "stromatype"
+
+```
+
+```{r}
+         maternal_stroma_sdz.sce                  <- as.SingleCellExperiment (maternal_stroma_sdz, assay = "RNA")
+colData (maternal_stroma_sdz.sce)$stromatype <- as.character            (maternal_stroma_sdz@active.ident) # from factor to character                 
+```
+
+
+```{r}
+         maternal_stroma_sdz.sce                  <- slingshot               (maternal_stroma_sdz.sce,
+                                                                       clusterLabels = 'stromatype',
+                                                                       reducedDim    = 'UMAP',
+                                                                       start.clus    = 'udStr',
+                                                                       end.clus      = c('SDZ2'),
+                                                                       stretch       = 0,
+                                                                       extend        = 'n',
+                                                                       omega         = TRUE)
+```
+
+#Figure 4D 
+```{r}
+pt_df_pdz <- data.frame(
+  pseudotime = slingPseudotime(maternal_stroma_pdz.sce)[,1],
+  Condition = colData(maternal_stroma_pdz.sce)$Condition,
+  cell_type = colData(maternal_stroma_pdz.sce)$stromatype
+)
+
+pt_df_sdz <- data.frame(
+  pseudotime = slingPseudotime(maternal_stroma_sdz.sce)[,1],
+  Condition = colData(maternal_stroma_sdz.sce)$Condition,
+  cell_type = colData(maternal_stroma_sdz.sce)$stromatype
+)
+
+#Plot for PDZ
+
+pt_df_pdz$Condition <- factor(pt_df_pdz$Condition, levels = c( "Maternal HFHS","Maternal Chow"))
+
+# Swarm plot (top)
+swarm_plot <- ggplot(pt_df_pdz, aes(x = pseudotime, y = Condition)) +
+  geom_quasirandom(
+    aes(color = cell_type),
+    groupOnX = FALSE,
+    varwidth = FALSE,
+    size = 1,
+    alpha = 1
+  ) +
+  scale_color_manual(values = cell_type_colors) +
+  labs(x = NULL, y = "Condition", color = "Cell Type") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "right",
+    panel.grid.major.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.title.y = element_text(angle = 90, vjust = 0.5),
+    axis.text.y = element_text(size = 10),
+    plot.margin = margin(0, 10, 0, 10)
+  )+ NoLegend()
+
+# Density plot (bottom)
+density_plot <- ggplot(pt_df_pdz, aes(x = pseudotime, color = Condition)) +
+  geom_density(size = 1.5) +
+  scale_color_manual(values = condition_colors) +
+  geom_vline(xintercept = c(5, 10, 15), color = "red", linetype = "dashed") +
+  labs(x = "Slingshot Pseudotime", y = "Density") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "none",
+    plot.margin = margin(0, 10, 0, 10)
+  )
+
+# Combine plots
+combined_plot <- swarm_plot / density_plot + plot_layout(heights = c(2, 1))
+combined_plot
+
+#Plot for SDZ
+pt_df_sdz$Condition <- factor(pt_df_sdz$Condition, levels = c( "Maternal HFHS","Maternal Chow"))
+
+# Swarm plot (top)
+swarm_plot <- ggplot(pt_df_sdz, aes(x = pseudotime, y = Condition)) +
+  geom_quasirandom(
+    aes(color = cell_type),
+    groupOnX = FALSE,
+    varwidth = FALSE,
+    size = 1,
+    alpha = 1
+  ) +
+  scale_color_manual(values = cell_type_colors) +
+  labs(x = NULL, y = "Condition", color = "Cell Type") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "right",
+    panel.grid.major.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.text.x = element_blank(),
+    axis.title.y = element_text(angle = 90, vjust = 0.5),
+    axis.text.y = element_text(size = 10),
+    plot.margin = margin(0, 10, 0, 10)
+  )+ NoLegend()
+
+# Density plot (bottom)
+density_plot <- ggplot(pt_df_sdz, aes(x = pseudotime, color = Condition)) +
+  geom_density(size = 1.5) +
+  scale_color_manual(values = condition_colors) +
+  geom_vline(xintercept = c(5, 10, 15), color = "red", linetype = "dashed") +
+  labs(x = "Slingshot Pseudotime", y = "Density") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "none",
+    plot.margin = margin(0, 10, 0, 10)
+  )
+
+# Combine plots
+combined_plot <- swarm_plot / density_plot + plot_layout(heights = c(2, 1))
+combined_plot
+```
+
+#Figure 4D Statistical Analysis - Kolmogorov-Smirnov Test 
+```{r}
+
+ks.test(slingPseudotime(maternal_stroma_pdz.sce)[colData(maternal_stroma_pdz.sce)$Condition == "Maternal Chow", 1],
+        slingPseudotime(maternal_stroma_pdz.sce)[colData(maternal_stroma_pdz.sce)$Condition == "Maternal HFHS", 1])
+
+ks.test(slingPseudotime(maternal_stroma_sdz.sce)[colData(maternal_stroma_sdz.sce)$Condition == "Maternal Chow", 1],
+        slingPseudotime(maternal_stroma_sdz.sce)[colData(maternal_stroma_sdz.sce)$Condition == "Maternal HFHS", 1])
+```
+
+#Figure S4E - Slingshot pseudotime / UMAP
+
+```{r}
+colors   <- colorRampPalette (brewer.pal (11, 'Spectral') [-6]) (100)
+plotcol1 <- colors [cut (slingPseudotime (maternal_stroma.sce, na = FALSE) [ , 1], breaks = 100) ]
+plotcol2 <- colors [cut (slingPseudotime (maternal_stroma.sce, na = FALSE) [ , 2], breaks = 100) ]
+plot  (reducedDims      (maternal_stroma.sce)$UMAP,  col = plotcol1, pch  = 16,       asp = 1)         
+
+
+plot  (reducedDims      (maternal_stroma.sce)$UMAP, col = plotcol1, pch  = 16,        asp = 1)                       
+lines (SlingshotDataSet (maternal_stroma.sce),      lwd = 2,        type = 'lineage', col = 'black', show.constraints = TRUE)
+lgd <- matrix      (colors)
+
+plot  (reducedDims      (maternal_stroma.sce)$UMAP,  col = plotcol2, pch  = 16,       asp = 1)                       
+lines (SlingshotDataSet (maternal_stroma.sce),       lwd = 2,       type = 'lineage', col = 'black', show.constraints = TRUE)
+lgd <- matrix      (colors)
+
+```

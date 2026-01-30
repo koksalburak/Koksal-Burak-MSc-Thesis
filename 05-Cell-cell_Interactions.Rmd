@@ -1,0 +1,639 @@
+---
+title: "05-Cell-cell Interactions"
+output: html_document
+date: "2025-06-26"
+---
+
+
+```{r setup, include=FALSE}
+library(Seurat)
+library(Matrix)
+library(SingleCellExperiment)
+library(tidyverse)
+library(scales)
+library(cowplot)
+library(dplyr)
+library(ggplot2)
+library(sctransform)
+library(ggraph)
+library(clustree)
+library(plotly)
+library(RCurl)
+library(harmony)
+library(biomaRt)
+library(AnnotationHub)
+library(ensembldb)
+library(shiny)
+library(scater)
+library(xlsx)
+library(DESeq2)
+library(ggrepel)
+library(ggpubr)
+library(enrichplot)
+library(openxlsx)
+library(clusterProfiler)
+library(DESeq2)
+library(ggrepel)
+library(ggpubr)
+library(brew)
+library(RColorBrewer)
+library(clusterProfiler)
+library(DOSE)
+library(pathview)
+library(org.Mm.eg.db)
+library(readxl)
+library(EnhancedVolcano)
+library(CellChat)
+library(patchwork)
+library(ggalluvial)
+library(NMF)
+library(future)
+```
+
+
+```{r}
+# Extract the 'strsubset' column and assign cell names
+strsubset_metadata <- maternal_stroma@meta.data[["strsubset"]]
+names(strsubset_metadata) <- rownames(maternal_stroma@meta.data)  # Assign cell names
+
+# Ensure the cell names are matched between the two objects
+common_cells <- intersect(names(strsubset_metadata), colnames(maternal_integrated))
+
+# Add the 'strsubset' column to the maternal_integrated metadata
+maternal_integrated@meta.data[common_cells, "strsubset"] <- strsubset_metadata[common_cells]
+
+# Verify the new metadata column in maternal_integrated
+head(maternal_integrated@meta.data)
+
+```
+```{r}
+UMAPPlot     (object = maternal_integrated, label = T, pt.size = 1, group.by = "strsubset")
+
+```
+
+```{r}
+maternal_integrated$strsubset[which(str_detect(maternal_integrated$celltype, "NK"))] <- "NK"
+maternal_integrated$strsubset[which(str_detect(maternal_integrated$celltype, "Macro"))] <- "Macro"
+
+```
+```{r}
+UMAPPlot     (object = maternal_integrated, label = T, pt.size = 1, group.by = "strsubset")
+
+```
+
+```{r}
+maternal_integrated <- SetIdent(maternal_integrated, value = maternal_integrated@meta.data$strsubset)
+
+
+maternal_subset <- subset(x = maternal_integrated, idents = c("Str0","Str1","Str2","Str3","Str4","NK","Macro"))
+maternal_subset <- SetIdent(maternal_subset, value = colnames(maternal_subset))
+maternal_subset$cellbarcode <- NA
+maternal_subset$cellbarcode <- Idents(maternal_subset)
+
+```
+
+
+```{r}
+maternal_subset$samples <- maternal_subset$orig.ident
+```
+
+
+
+```{r}
+ptm = Sys.time()
+
+data.input = maternal_subset@assays$RNA$data # normalized data matrix
+meta = maternal_subset@meta.data # a dataframe with rownames containing cell mata data
+cell.use = rownames(meta)[meta$Condition == "Maternal Chow"] # extract the cell names from disease data
+
+```
+
+```{r}
+data.input = data.input[, cell.use]
+meta = meta[cell.use, ]
+```
+
+```{r}
+unique(rownames(meta$strsubset)) # check the cell labels
+
+```
+
+```{r}
+cellchat_chow <- createCellChat(object = data.input, meta = meta, group.by = "strsubset")
+
+```
+
+```{r}
+cellchat_chow <- addMeta(cellchat_chow, meta = meta)
+cellchat_chow <- setIdent(cellchat_chow, ident.use = "strsubset") # set "labels" as default cell identity
+levels(cellchat_chow@idents) # show factor levels of the cell labels
+groupSize <- as.numeric(table(cellchat_chow@idents)) # number of cells in each cell group
+```
+
+
+
+```{r}
+
+# use a subset of CellChatDB for cell-cell communication analysis
+#CellChatDB.use <- subsetDB(CellChatDB, search = "Secreted Signaling", key = "annotation") # use Secreted Signaling
+# use all CellChatDB for cell-cell communication analysis
+
+# set the used database in the object
+
+CellChatDB <- CellChatDB.mouse
+showDatabaseCategory(CellChatDB)
+dplyr::glimpse(CellChatDB$interaction)
+cellchat_chow@DB <- CellChatDB
+
+```
+
+```{r}
+# subset the expression data of signaling genes for saving computation cost
+cellchat_chow <- subsetData(cellchat_chow) # This step is necessary even if using the whole database
+future::plan("multisession", workers = 4) # do parallel
+cellchat_chow <- identifyOverExpressedGenes(cellchat_chow)
+cellchat_chow <- identifyOverExpressedInteractions(cellchat_chow)
+execution.time = Sys.time() - ptm
+print(as.numeric(execution.time, units = "secs"))
+
+```
+
+```{r}
+ptm = Sys.time()
+cellchat_chow <- computeCommunProb(cellchat_chow, type = "triMean")
+```
+
+
+```{r}
+cellchat_chow <- filterCommunication(cellchat_chow, min.cells = 10)
+
+```
+
+```{r}
+cellchat_chow <- computeCommunProbPathway(cellchat_chow)
+
+```
+
+```{r}
+cellchat_chow <- aggregateNet(cellchat_chow)
+execution.time = Sys.time() - ptm
+print(as.numeric(execution.time, units = "secs"))
+```
+
+```{r}
+# Access all the signaling pathways showing significant communications
+pathways.show.all <- cellchat_chow@netP$pathways
+# check the order of cell identity to set suitable vertex.receiver
+levels(cellchat_chow@idents)
+vertex.receiver = seq(1,4)
+for (i in 1:length(pathways.show.all)) {
+  # Visualize communication network associated with both signaling pathway and individual L-R pairs
+  netVisual(cellchat_chow, signaling = pathways.show.all[i], vertex.receiver = vertex.receiver, layout = "hierarchy")
+  # Compute and visualize the contribution of each ligand-receptor pair to the overall signaling pathway
+  gg <- netAnalysis_chowtribution(cellchat_chow, signaling = pathways.show.all[i])
+  ggsave(filename=paste0(pathways.show.all[i], "_L-R_chowtribution.pdf"), plot=gg,path = "~/scdbl_CellChat_major_graphs", width = 3, height = 2, units = 'in', dpi = 300)
+}
+```
+
+
+```{r}
+ptm = Sys.time()
+# Compute the network centrality scores
+cellchat_chow <- netAnalysis_computeCentrality(cellchat_chow, slot.name = "netP") # the slot 'netP' means the inferred intercellular communication network of signaling pathways
+# Visualize the computed centrality scores using heatmap, allowing ready identification of major signaling roles of cell groups
+netAnalysis_signalingRole_network(cellchat_chow, signaling = pathways.show, width = 8, height = 2.5, font.size = 10)
+```
+
+```{r}
+selectK(cellchat_chow, pattern = "outgoing")
+
+```
+
+```{r}
+#based on SelectK argument, when there's a significant drop in Cophenetic and Silhouette values
+nPatterns = 4
+cellchat_chow <- identifyCommunicationPatterns(cellchat_chow, pattern = "outgoing", k = nPatterns)
+```
+
+```{r}
+# river plot
+netAnalysis_river(cellchat_chow, pattern = "outgoing")
+
+# dot plot
+netAnalysis_dot(cellchat_chow, pattern = "outgoing")
+```
+
+
+```{r}
+selectK(cellchat_chow, pattern = "incoming")
+
+```
+
+```{r}
+nPatterns = 4
+cellchat_chow <- identifyCommunicationPatterns(cellchat_chow, pattern = "incoming", k = nPatterns)
+```
+
+
+
+```{r}
+# river plot
+netAnalysis_river(cellchat_chow, pattern = "incoming")
+
+# dot plot
+netAnalysis_dot(cellchat_chow, pattern = "incoming")
+```
+
+
+
+```{r}
+ptm = Sys.time()
+
+data.input = maternal_subset@assays$RNA$data # normalized data matrix
+meta = maternal_subset@meta.data # a dataframe with rownames containing cell mata data
+cell.use = rownames(meta)[meta$Condition == "Maternal HFHS"] # extract the cell names from disease data
+
+```
+
+```{r}
+data.input = data.input[, cell.use]
+meta = meta[cell.use, ]
+```
+
+```{r}
+unique(rownames(meta$strsubset)) # check the cell labels
+
+```
+
+```{r}
+cellchat_hfhs <- createCellChat(object = data.input, meta = meta, group.by = "strsubset")
+
+```
+
+```{r}
+cellchat_hfhs <- addMeta(cellchat_hfhs, meta = meta)
+cellchat_hfhs <- setIdent(cellchat_hfhs, ident.use = "strsubset") # set "labels" as default cell identity
+levels(cellchat_hfhs@idents) # show factor levels of the cell labels
+groupSize <- as.numeric(table(cellchat_hfhs@idents)) # number of cells in each cell group
+```
+
+
+
+```{r}
+
+# use a subset of CellChatDB for cell-cell communication analysis
+#CellChatDB.use <- subsetDB(CellChatDB, search = "Secreted Signaling", key = "annotation") # use Secreted Signaling
+# use all CellChatDB for cell-cell communication analysis
+
+# set the used database in the object
+
+
+CellChatDB <- CellChatDB.mouse
+showDatabaseCategory(CellChatDB)
+dplyr::glimpse(CellChatDB$interaction)
+cellchat_hfhs@DB <- CellChatDB
+
+```
+
+```{r}
+# subset the expression data of signaling genes for saving computation cost
+cellchat_hfhs <- subsetData(cellchat_hfhs) # This step is necessary even if using the whole database
+future::plan("multisession", workers = 4) # do parallel
+cellchat_hfhs <- identifyOverExpressedGenes(cellchat_hfhs)
+cellchat_hfhs <- identifyOverExpressedInteractions(cellchat_hfhs)
+execution.time = Sys.time() - ptm
+print(as.numeric(execution.time, units = "secs"))
+
+```
+
+```{r}
+ptm = Sys.time()
+cellchat_hfhs <- computeCommunProb(cellchat_hfhs, type = "triMean")
+```
+
+
+```{r}
+cellchat_hfhs <- filterCommunication(cellchat_hfhs, min.cells = 10)
+
+```
+
+```{r}
+cellchat_hfhs <- computeCommunProbPathway(cellchat_hfhs)
+
+```
+
+```{r}
+cellchat_hfhs <- aggregateNet(cellchat_hfhs)
+execution.time = Sys.time() - ptm
+print(as.numeric(execution.time, units = "secs"))
+```
+
+```{r}
+ptm = Sys.time()
+groupSize <- as.numeric(table(cellchat_hfhs@idents))
+par(mfrow = c(1,2), xpd=TRUE)
+netVisual_circle(cellchat_hfhs@net$count, vertex.weight = groupSize, weight.scale = T, label.edge= F, title.name = "Number of interactions")
+netVisual_circle(cellchat_hfhs@net$weight, vertex.weight = groupSize, weight.scale = T, label.edge= F, title.name = "Interaction weights/strength")
+```
+
+```{r}
+#returns a data frame consisting of all the inferred cell-cell communications at the level of ligands/receptors. Set slot.name = "netP" to access the the inferred communications at the level of signaling pathways
+
+df.net <- subsetCommunication(cellchat_hfhs) 
+df.net_netp <- subsetCommunication(cellchat_hfhs, slot.name = "netP") 
+
+```
+
+```{r}
+# Access all the signaling pathways showing significant communications
+pathways.show.all <- cellchat_hfhs@netP$pathways
+# check the order of cell identity to set suitable vertex.receiver
+levels(cellchat_hfhs@idents)
+vertex.receiver = seq(1,4)
+for (i in 1:length(pathways.show.all)) {
+  # Visualize communication network associated with both signaling pathway and individual L-R pairs
+  netVisual(cellchat_hfhs, signaling = pathways.show.all[i], vertex.receiver = vertex.receiver, layout = "hierarchy")
+  # Compute and visualize the contribution of each ligand-receptor pair to the overall signaling pathway
+  gg <- netAnalysis_chowtribution(cellchat_hfhs, signaling = pathways.show.all[i])
+  ggsave(filename=paste0(pathways.show.all[i], "_L-R_chowtribution.pdf"), plot=gg, width = 3, height = 2, units = 'in', dpi = 300)
+}
+```
+
+```{r}
+ptm = Sys.time()
+# Compute the network centrality scores
+cellchat_hfhs <- netAnalysis_computeCentrality(cellchat_hfhs, slot.name = "netP") # the slot 'netP' means the inferred intercellular communication network of signaling pathways
+# Visualize the computed centrality scores using heatmap, allowing ready identification of major signaling roles of cell groups
+netAnalysis_signalingRole_network(cellchat_hfhs, signaling = pathways.show, width = 8, height = 2.5, font.size = 10)
+```
+
+```{r}
+selectK(cellchat_hfhs, pattern = "outgoing")
+
+```
+
+```{r}
+#based on SelectK argument, when there's a significant drop in Cophenetic and Silhouette values
+nPatterns = 4
+cellchat_hfhs <- identifyCommunicationPatterns(cellchat_hfhs, pattern = "outgoing", k = nPatterns)
+```
+
+```{r}
+# river plot
+netAnalysis_river(cellchat_hfhs, pattern = "outgoing")
+
+# dot plot
+netAnalysis_dot(cellchat_hfhs, pattern = "outgoing")
+```
+
+
+```{r}
+selectK(cellchat_hfhs, pattern = "incoming")
+
+```
+
+```{r}
+nPatterns = 5
+cellchat_hfhs <- identifyCommunicationPatterns(cellchat_hfhs, pattern = "incoming", k = nPatterns)
+```
+
+
+
+```{r}
+# river plot
+netAnalysis_river(cellchat_hfhs, pattern = "incoming")
+
+# dot plot
+netAnalysis_dot(cellchat_hfhs, pattern = "incoming")
+```
+
+
+
+```{r}
+ptm = Sys.time()
+
+object.list <- list(Chow = cellchat_chow, HFHS = cellchat_hfhs)
+cellchat <- mergeCellChat(object.list, add.names = names(object.list))
+execution.time = Sys.time() - ptm
+print(as.numeric(execution.time, units = "secs"))
+```
+
+#Figure5A 
+```{r}
+
+par(mfrow = c(1,2), xpd=TRUE)
+netVisual_diffInteraction(cellchat, weight.scale = T, top = 0.5,margin = 0.1)
+netVisual_diffInteraction(cellchat, weight.scale = T, measure = "weight", top = 0.5,margin = 0.1)
+
+```
+
+
+#Figure5B and Table8 - Ranknet comparison
+```{r}
+gg1 <-rankNet(cellchat, mode = "comparison", stacked = T, do.stat = TRUE,color.use =c("dodgerblue2", "indianred"), return.data = T)
+
+df <- gg1$signaling.contribution
+
+write.xlsx (df, file = "~/maternal_ranknet_statresults_table.xlsx")
+
+```
+
+
+
+
+```{r}
+# Extract the 'strsubset' column and assign cell names
+strsubset_metadata <- maternal_stroma@meta.data[["strsubset"]]
+names(strsubset_metadata) <- rownames(maternal_stroma@meta.data)  # Assign cell names
+
+# Ensure the cell names are matched between the two objects
+common_cells <- intersect(names(strsubset_metadata), colnames(maternal_integrated))
+
+# Add the 'strsubset' column to the maternal_integrated metadata
+maternal_integrated@meta.data[common_cells, "strsubset"] <- strsubset_metadata[common_cells]
+
+# Verify the new metadata column in maternal_integrated
+head(maternal_integrated@meta.data)
+
+```
+```{r}
+UMAPPlot     (object = maternal_integrated, label = T, pt.size = 1, group.by = "strsubset")
+
+```
+
+```{r}
+maternal_integrated$strsubset[which(str_detect(maternal_integrated$celltype, "NK"))] <- "NK"
+maternal_integrated$strsubset[which(str_detect(maternal_integrated$celltype, "Macro"))] <- "Macro"
+maternal_integrated$strsubset[which(str_detect(maternal_integrated$strsubset, "Str0"))] <- "udStr"
+maternal_integrated$strsubset[which(str_detect(maternal_integrated$strsubset, "Str1"))] <- "SDZ1"
+maternal_integrated$strsubset[which(str_detect(maternal_integrated$strsubset, "Str2"))] <- "SDZ2"
+maternal_integrated$strsubset[which(str_detect(maternal_integrated$strsubset, "Str3"))] <- "PDZ1"
+maternal_integrated$strsubset[which(str_detect(maternal_integrated$strsubset, "Str4"))] <- "PDZ2"
+
+
+```
+
+```{r}
+maternal_integrated <- SetIdent(maternal_integrated, value = maternal_integrated@meta.data$strsubset)
+
+maternal_subset <- subset(x = maternal_integrated, idents = c("udStr","PDZ1","PDZ2","SDZ1","SDZ2","NK","Macro"))
+
+```
+
+#Figure5C - Desmosterol Circleplot
+```{r}
+
+pathways.show <- c("Desmosterol")
+
+for (j in 1:length(pathways.show)) {
+  weight.max <- getMaxWeight(object.list, slot.name = c("netP"), attribute = pathways.show[j])
+
+  par(mfrow = c(1, length(object.list)), xpd=TRUE)
+
+  for (i in 1:length(object.list)) {
+    netVisual_aggregate(object.list[[i]], signaling = pathways.show[j], layout = "circle", pt.title = 20, point.size = 10, edge.weight.max = weight.max[1], edge.width.max = 20, signaling.name = paste(pathways.show[j], names(object.list)[i]), top = 0.5)
+  }
+}
+
+for (j in 1:length(pathways.show)) {
+  weight.max <- getMaxWeight(object.list, slot.name = c("netP"), attribute = pathways.show[j])
+
+  par(mfrow = c(1, length(object.list)), xpd=TRUE)
+
+  for (i in 1:length(object.list)) {
+    netVisual_aggregate(object.list[[i]], signaling = pathways.show[j], layout = "chord", pt.title = 20, point.size = 8, edge.weight.max = weight.max[1], edge.width.max = 20, signaling.name = paste(pathways.show[j], names(object.list)[i]), top = 0.5)
+  }
+}
+
+
+```
+
+#Figure5D - Desmosterol Enriched L-R ViolinPlot
+
+#Extract enriched LR pairs
+```{r}
+pathways.show <-  c("Desmosterol") 
+
+pairLR.Desmosterol <- extractEnrichedLR(cellchat, signaling = pathways.show, geneLR.return = TRUE)
+extractEnrichedLR(cellchat, signaling = "Desmosterol", geneLR.return = T)
+```
+
+```{r}
+
+DefaultAssay(maternal_subset) <- "RNA"
+
+
+Idents       (maternal_subset) <- "strsubset"
+
+my_levels <- c("udStr","PDZ1","PDZ2","SDZ1","SDZ2","NK","Macro")
+
+
+maternal_subset@active.ident <- factor (maternal_subset@active.ident, levels = my_levels)
+
+genes <- c("Dhcr7" ,"Nr1h2", "Nr1h3")
+ VlnPlot(maternal_subset, genes,
+            pt.size = 0, 
+           group.by = "strsubset",
+    split.by  = "Condition",split.plot=TRUE, stack = TRUE, flip = T, cols=c("dodgerblue2", "indianred"))  +
+  geom_boxplot(width = 0.25, notch = FALSE, notchwidth = .4, outlier.shape = NA,  coef=0,show.legend=FALSE)+NoLegend()
+ 
+
+```
+
+
+
+
+
+
+#Figure5E - GALECTIN Circleplot
+```{r}
+
+pathways.show <- c("GALECTIN")
+
+for (j in 1:length(pathways.show)) {
+  weight.max <- getMaxWeight(object.list, slot.name = c("netP"), attribute = pathways.show[j])
+
+  par(mfrow = c(1, length(object.list)), xpd=TRUE)
+
+  for (i in 1:length(object.list)) {
+    netVisual_aggregate(object.list[[i]], signaling = pathways.show[j], layout = "circle", pt.title = 20, point.size = 10, edge.weight.max = weight.max[1], edge.width.max = 20, signaling.name = paste(pathways.show[j], names(object.list)[i]), top = 0.5)
+  }
+}
+
+for (j in 1:length(pathways.show)) {
+  weight.max <- getMaxWeight(object.list, slot.name = c("netP"), attribute = pathways.show[j])
+
+  par(mfrow = c(1, length(object.list)), xpd=TRUE)
+
+  for (i in 1:length(object.list)) {
+    netVisual_aggregate(object.list[[i]], signaling = pathways.show[j], layout = "chord", pt.title = 20, point.size = 8, edge.weight.max = weight.max[1], edge.width.max = 20, signaling.name = paste(pathways.show[j], names(object.list)[i]), top = 0.5)
+  }
+}
+
+
+
+```
+
+
+#Figure5F - GALECTIN Enriched L-R ViolinPlot
+
+#Extract enriched LR pairs
+```{r}
+pathways.show <-  c("GALECTIN") 
+pairLR.GALECTIN <- extractEnrichedLR(cellchat, signaling = pathways.show, geneLR.return = TRUE)
+extractEnrichedLR(cellchat, signaling = "GALECTIN", enriched.only = T,geneLR.return = T)
+
+```
+
+
+```{r}
+
+DefaultAssay(maternal_subset) <- "RNA"
+
+
+Idents       (maternal_subset) <- "strsubset"
+
+my_levels <- c("udStr","PDZ1","PDZ2","SDZ1","SDZ2","NK","Macro")
+
+maternal_subset@active.ident <- factor (maternal_subset@active.ident, levels = my_levels)
+
+genes <- c("Lgals9", "Ptprc",  "Ighm" ,  "Cd44" ,  "P4hb",   "Havcr2")
+
+
+ VlnPlot(maternal_subset, genes,
+            pt.size = 0, 
+           group.by = "strsubset",
+    split.by  = "Condition",split.plot=TRUE, stack = TRUE, flip = T, cols=c("dodgerblue2", "indianred"))  +
+  geom_boxplot(width = 0.25, notch = FALSE, notchwidth = .4, outlier.shape = NA,  coef=0,show.legend=FALSE)+NoLegend()
+ 
+
+
+```
+
+
+#FigureS5A 
+```{r}
+
+gg1 <- netVisual_heatmap(cellchat, color.heatmap = c("#2166AC","#B2182B"))
+#> Do heatmap based on a merged object
+gg2 <- netVisual_heatmap(cellchat, measure = "weight",color.heatmap =  c("#2166AC","#B2182B"))
+#> Do heatmap based on a merged object
+gg1 + gg2
+```
+
+
+#FigureS5B
+```{r}
+target_clusters <- c(2)
+
+netVisual_bubble(cellchat, sources.use = 5, targets.use = target_clusters,  comparison = c(1, 2), max.dataset = 2, title.name = "Increased signaling in HFHS", angle.x = 45, remove.isolate = T)
+```
+
+
+#FigureS5C
+```{r}
+target_clusters <- c(1)
+
+
+netVisual_bubble(cellchat, sources.use = c(3,6,7), targets.use = target_clusters,  comparison = c(1, 2), max.dataset = 1, title.name = "Decreased signaling in HFHS", angle.x = 45, remove.isolate = T)
+```
