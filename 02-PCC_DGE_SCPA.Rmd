@@ -50,7 +50,7 @@ library(circlize)
 library(patchwork)
 ```
  
-#Figure 2A - PCC
+#Figure 4.3A - PCC
 ```{r}
 maternal_integrated <- SetIdent(maternal_integrated, value = maternal_integrated@meta.data$Condition)
 av.exp <- AverageExpression(maternal_integrated)$RNA
@@ -110,7 +110,7 @@ maternal_smc <- subset(x = maternal_integrated, idents = c("SMC"))
 ```
 
 
-#DGE - Figure2B, 2E and Table 3
+#DGE - Figure4.3B, 4.4A and Supplemental File 4.3, Supplemental File 4.6
 
 ```{r}
 DefaultAssay(maternal_hand2neg) <- "RNA"
@@ -357,8 +357,152 @@ maternal_smc.MAST_filtered <- filter_DGE(maternal_smc.MAST)
 
 ```
 
+#Supplemental File 4.3 - Pseudobulk DESeq2 
 
-#Figure 2C - Scatter Plots
+```{r}
+maternal_integrated$majorcelltype <- NA
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S1"))] <- "Hand2Pos"
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S2"))] <- "Hand2Pos"
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S3"))] <- "Hand2Pos" 
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S4"))] <- "Hand2Neg"
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "S5"))] <- "Hand2Pos"
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "NK"))] <- "NK"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Macro"))] <- "Macro" 
+
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "T"))] <- "T"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "ILC-Like"))] <- "ILC-Like" 
+
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Epi1"))] <- "Epi"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Epi2"))] <- "Meso" 
+
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Endo1"))] <- "Endo1"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "Endo2"))] <- "Endo2" 
+
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "SMC"))] <- "SMC"                  
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "cDC1"))] <- "cDC1" 
+maternal_integrated$majorcelltype[which(str_detect(maternal_integrated$celltype, "cDC2"))] <- "cDC2"
+
+```
+
+```{r}
+UMAPPlot     (object = maternal_integrated, label = TRUE, pt.size = 1, group.by = "majorcelltype")                      + NoLegend ()
+
+```
+
+
+```{r}
+maternal_integrated$Diet <- NA
+maternal_integrated$Diet[str_detect(maternal_integrated$Condition, "Maternal Control")] <- "Chow"
+maternal_integrated$Diet[str_detect(maternal_integrated$Condition, "Maternal HFHS")] <- "HFHS"
+maternal_integrated$Diet <- factor(maternal_integrated$Diet, levels = c("Chow", "HFHS"))
+
+```
+
+```{r}
+#Pseudobulk counts
+pseudo_integrated <- AggregateExpression(
+  maternal_integrated,
+  assays = "RNA",
+  return.seurat = TRUE,
+  group.by = c("Diet", "orig.ident", "majorcelltype"))
+```
+
+```{r}
+pb_cells <- Cells(pseudo_integrated)
+pb_meta <- data.frame(cell = pb_cells, row.names = pb_cells)
+pb_meta$Diet       <- sub("_.*", "", pb_meta$cell)
+pb_meta$orig.ident <- sub("^[^_]+_([^_]+)_.*", "\\1", pb_meta$cell)
+pb_meta$majorcelltype <- sub(".*_", "", pb_meta$cell)
+pseudo_integrated <- AddMetaData(pseudo_integrated, metadata = pb_meta)
+
+pseudo_integrated$majorcelltype.Diet <- paste(pseudo_integrated$majorcelltype, pseudo_integrated$Diet, sep = "_")
+Idents(pseudo_integrated) <- "majorcelltype.Diet"
+
+maternal_integrated$majorcelltype.Diet <- paste(maternal_integrated$majorcelltype, maternal_integrated$Diet, sep = "_")
+Idents(maternal_integrated) <- "majorcelltype.Diet"
+DefaultAssay(maternal_integrated) <- "RNA"
+```
+
+```{r}
+Idents(maternal_integrated) <- "majorcelltype.Diet"
+
+```
+
+
+```{r}
+majorcelltypes <- c("cDC1",     "cDC2" ,    "Endo1",    "Endo2" ,   "Hand2Neg", "Hand2Pos", "ILC-Like", "Macro", "NK","SMC" ,     "T"   , "Epi", "Meso"  )
+
+for (stype in majorcelltypes) {
+  
+  # Define coınditions
+  ident1 <- paste0(stype, "_HFHS")
+  ident2 <- paste0(stype, "_Chow")
+  
+  # Bulk DE
+  bulk_de <- FindMarkers(
+    object   = pseudo_integrated,
+    ident.1  = ident1,
+    ident.2  = ident2,
+    test.use = "DESeq2"
+  )
+  
+  xlsx::write.xlsx(bulk_de, file = paste0("~/Maternal_Obesity/final_analyses/DGE_revisions/maternal_", stype, "_bulk_DGE.xlsx"))
+
+}
+
+```
+
+
+#Figure 4.3C - DEG vs Cell Capture
+
+```{r}
+library(ggplot2)
+
+df <- data.frame(
+  cell_type = c("cDC1", "cDC2", "Endo1", "Endo2", "Epi", "Meso", "Hand2Neg", "Hand2Pos",
+                "ILC-Like", "Macro", "NK", "SMC", "T"),
+  num_DEGs = c(11, 162, 3, 4, 1, 0, 308, 2063, 10, 219, 307, 1, 4),
+  num_cells = c(1370, 2900, 644, 487, 201, 99, 5427, 44937, 554, 5500, 9688, 101, 441)
+)
+
+cell_colors <- c(
+  "cDC1" = '#9467bd',
+  "cDC2" = 'mediumvioletred',
+  "Endo1" = 'slateblue1',
+  "Endo2" = 'lightgoldenrod3',
+  "Epi" = 'seagreen2',
+  "Meso" = '#882255',
+  "Hand2Neg" = 'wheat4',
+  "Hand2Pos" = '#ffd42aff',
+  "ILC-Like" = 'cadetblue3',
+  "Macro" = '#332395',
+  "NK" = '#CC6677',
+  "SMC" = 'tomato3',
+  "T" = 'turquoise4'
+)
+
+model <- lm(num_DEGs ~ num_cells, data = df)
+r2 <- summary(model)$r.squared
+pval <- summary(model)$coefficients[2, 4]
+
+ggplot(df, aes(x = num_cells, y = num_DEGs, color = cell_type, label = cell_type)) +
+  geom_point(size = 10) +
+  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed") +
+  geom_text(vjust = -1, size = 3) +
+  scale_color_manual(values = cell_colors) +
+  annotate("text", 
+           x = max(df$num_cells) * 0.5, 
+           y = max(df$num_DEGs) * 0.9,
+           label = paste0("R² = ", round(r2, 3), 
+                          "\nP = ", signif(pval, 3)),
+           hjust = 0, size = 4) +
+  theme_minimal() +
+  labs(x = "Number of Cells", y = "Number of DEGs",
+       title = "Relationship between Number of Cells and DEGs per Cell Type")
+```
+
+
+#Figure 4.4A - Scatter Plots
 
 
 ```{r}
@@ -755,7 +899,7 @@ ggplot(maternal_macro.MAST, aes(x = pct.1, y = pct.2, color = group))+
 
 ```
 
-#Figure 2E and Table4 - SCPA
+#Figure 4.5A and Supplemental File 4.5 - SCPA
 
 
 #Overwriting SCPA compare_seurat function to include more cells to the comparison (default=500, change it to 3000)
@@ -999,7 +1143,7 @@ scpa_nk_hallmark <- scpa_nk_hallmark %>%
 
 
 
-#Figure 2E plot SCPA outputs
+#Figure 4.4A plot SCPA outputs
 
 ```{r}
 
@@ -1071,55 +1215,8 @@ ggplot(scpa_nk_hallmark, aes(-FC, qval)) +
 ```
 
 
-#Figure S2A - DEG vs Cell Capture
 
-```{r}
-library(ggplot2)
-
-df <- data.frame(
-  cell_type = c("cDC1", "cDC2", "Endo1", "Endo2", "Epi", "Meso", "Hand2Neg", "Hand2Pos",
-                "ILC-Like", "Macro", "NK", "SMC", "T"),
-  num_DEGs = c(11, 162, 3, 4, 1, 0, 308, 2063, 10, 219, 307, 1, 4),
-  num_cells = c(1370, 2900, 644, 487, 201, 99, 5427, 44937, 554, 5500, 9688, 101, 441)
-)
-
-cell_colors <- c(
-  "cDC1" = '#9467bd',
-  "cDC2" = 'mediumvioletred',
-  "Endo1" = 'slateblue1',
-  "Endo2" = 'lightgoldenrod3',
-  "Epi" = 'seagreen2',
-  "Meso" = '#882255',
-  "Hand2Neg" = 'wheat4',
-  "Hand2Pos" = '#ffd42aff',
-  "ILC-Like" = 'cadetblue3',
-  "Macro" = '#332395',
-  "NK" = '#CC6677',
-  "SMC" = 'tomato3',
-  "T" = 'turquoise4'
-)
-
-model <- lm(num_DEGs ~ num_cells, data = df)
-r2 <- summary(model)$r.squared
-pval <- summary(model)$coefficients[2, 4]
-
-ggplot(df, aes(x = num_cells, y = num_DEGs, color = cell_type, label = cell_type)) +
-  geom_point(size = 10) +
-  geom_smooth(method = "lm", se = FALSE, color = "black", linetype = "dashed") +
-  geom_text(vjust = -1, size = 3) +
-  scale_color_manual(values = cell_colors) +
-  annotate("text", 
-           x = max(df$num_cells) * 0.5, 
-           y = max(df$num_DEGs) * 0.9,
-           label = paste0("R² = ", round(r2, 3), 
-                          "\nP = ", signif(pval, 3)),
-           hjust = 0, size = 4) +
-  theme_minimal() +
-  labs(x = "Number of Cells", y = "Number of DEGs",
-       title = "Relationship between Number of Cells and DEGs per Cell Type")
-```
-
-#Figure S2B - SCPA Heatmap
+#Figure 4.4B - SCPA Heatmap
 
 ```{r}
 hand2pos_info_FC <- scpa_hand2pos_hallmark %>%

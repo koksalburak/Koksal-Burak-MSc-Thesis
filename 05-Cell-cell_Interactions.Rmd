@@ -418,7 +418,7 @@ execution.time = Sys.time() - ptm
 print(as.numeric(execution.time, units = "secs"))
 ```
 
-#Figure5A 
+#Figure 6.1A
 ```{r}
 
 par(mfrow = c(1,2), xpd=TRUE)
@@ -427,8 +427,35 @@ netVisual_diffInteraction(cellchat, weight.scale = T, measure = "weight", top = 
 
 ```
 
+#Figure 6.1B 
+```{r}
 
-#Figure5B and Table8 - Ranknet comparison
+gg1 <- netVisual_heatmap(cellchat, color.heatmap = c("#2166AC","#B2182B"))
+#> Do heatmap based on a merged object
+gg2 <- netVisual_heatmap(cellchat, measure = "weight",color.heatmap =  c("#2166AC","#B2182B"))
+#> Do heatmap based on a merged object
+gg1 + gg2
+```
+
+
+#Figure 6.2A
+```{r}
+target_clusters <- c(2)
+
+netVisual_bubble(cellchat, sources.use = 5, targets.use = target_clusters,  comparison = c(1, 2), max.dataset = 2, title.name = "Increased signaling in HFHS", angle.x = 45, remove.isolate = T)
+```
+
+
+#Figure 6.2B
+```{r}
+target_clusters <- c(1)
+
+
+netVisual_bubble(cellchat, sources.use = c(3,6,7), targets.use = target_clusters,  comparison = c(1, 2), max.dataset = 1, title.name = "Decreased signaling in HFHS", angle.x = 45, remove.isolate = T)
+```
+
+
+#Figure 6.3A and Supplemental File 6.1 - Ranknet comparison
 ```{r}
 gg1 <-rankNet(cellchat, mode = "comparison", stacked = T, do.stat = TRUE,color.use =c("dodgerblue2", "indianred"), return.data = T)
 
@@ -480,7 +507,7 @@ maternal_subset <- subset(x = maternal_integrated, idents = c("udStr","PDZ1","PD
 
 ```
 
-#Figure5C - Desmosterol Circleplot
+#Figure 6.3B - Desmosterol Circleplot
 ```{r}
 
 pathways.show <- c("Desmosterol")
@@ -508,7 +535,7 @@ for (j in 1:length(pathways.show)) {
 
 ```
 
-#Figure5D - Desmosterol Enriched L-R ViolinPlot
+#Figure 6.3C - Desmosterol Enriched L-R ViolinPlot
 
 #Extract enriched LR pairs
 ```{r}
@@ -545,7 +572,7 @@ genes <- c("Dhcr7" ,"Nr1h2", "Nr1h3")
 
 
 
-#Figure5E - GALECTIN Circleplot
+#Figure 6.3D - GALECTIN Circleplot
 ```{r}
 
 pathways.show <- c("GALECTIN")
@@ -575,7 +602,7 @@ for (j in 1:length(pathways.show)) {
 ```
 
 
-#Figure5F - GALECTIN Enriched L-R ViolinPlot
+#Figure 6.3E - GALECTIN Enriched L-R ViolinPlot
 
 #Extract enriched LR pairs
 ```{r}
@@ -611,29 +638,4 @@ genes <- c("Lgals9", "Ptprc",  "Ighm" ,  "Cd44" ,  "P4hb",   "Havcr2")
 ```
 
 
-#FigureS5A 
-```{r}
 
-gg1 <- netVisual_heatmap(cellchat, color.heatmap = c("#2166AC","#B2182B"))
-#> Do heatmap based on a merged object
-gg2 <- netVisual_heatmap(cellchat, measure = "weight",color.heatmap =  c("#2166AC","#B2182B"))
-#> Do heatmap based on a merged object
-gg1 + gg2
-```
-
-
-#FigureS5B
-```{r}
-target_clusters <- c(2)
-
-netVisual_bubble(cellchat, sources.use = 5, targets.use = target_clusters,  comparison = c(1, 2), max.dataset = 2, title.name = "Increased signaling in HFHS", angle.x = 45, remove.isolate = T)
-```
-
-
-#FigureS5C
-```{r}
-target_clusters <- c(1)
-
-
-netVisual_bubble(cellchat, sources.use = c(3,6,7), targets.use = target_clusters,  comparison = c(1, 2), max.dataset = 1, title.name = "Decreased signaling in HFHS", angle.x = 45, remove.isolate = T)
-```

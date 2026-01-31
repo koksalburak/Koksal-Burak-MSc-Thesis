@@ -173,7 +173,7 @@ plot_cell_trajectory (maternal_stroma.monocle, color_by = "Pseudotime")
 
 ```
 
-#Figure 4A and Figure S4A
+#Figure 5.4A and Figure 5.4B
 
 ```{r}
 plot_cell_trajectory (maternal_stroma.monocle,
@@ -538,7 +538,7 @@ plot_cell_trajectory (maternal_stroma_hfhs.monocle, color_by = "Pseudotime",    
 ```
 
 
-#Figure 4B 
+#Figure 5.5A 
 ```{r}
 plot_cell_trajectory (maternal_stroma_chow.monocle,
                       color_by           =   "seurat_clusters",
@@ -567,7 +567,7 @@ gc ()
 ```
 
 
-#Figure 4C analyses
+#Figure 5.5B analyses
 
 ```{r}
 maternal_stroma_chow_BEAM_res <- BEAM (maternal_stroma_chow.monocle,
@@ -616,7 +616,7 @@ write.xlsx(diff_test_res_pseudocond,
 ```
 
 
-#Figure 4C - branched heatmap
+#Figure 5.5B - branched heatmap
 
 ```{r}
 #List is curated from diff_test_res_pseudocond results and some canonial markers were added to define origin and endpoints
@@ -695,7 +695,7 @@ maternal_stroma.monocle3 <- learn_graph (maternal_stroma.monocle3)
 maternal_stroma.monocle3 <- order_cells (maternal_stroma.monocle3,root_cells = ("Chow82_TCATGGACATTCGATG-1") )
 ```
 
-#Figure S4B
+#Figure 5.4C and D
 ```{r}
 
 plot_cells (maternal_stroma.monocle3,
@@ -710,7 +710,7 @@ plot_cells (maternal_stroma.monocle3,
 ```
 
 
-#Figure S4C and S4D - Screenshots from the 3D object 
+#Figure 5.4E - Screenshots from the 3D object 
 
 ```{r}
 maternal_stroma.monocle3 <- preprocess_cds(maternal_stroma.monocle3,method = "PCA", num_dim = 30)
@@ -728,7 +728,7 @@ plot_cells_3d(maternal_stroma.monocle3_3d, color_cells_by="strsubset", color_pal
 #Slingshot analysis
 ```{r}
 maternal_stroma$stromatype <- NA
-maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str0"))] <- "udStr"
+maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str0"))] <- "unStr"
 maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str1"))] <- "SDZ1"
 maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str2"))] <- "SDZ2" 
 maternal_stroma$stromatype[which(str_detect(maternal_stroma$strsubset, "Str3"))] <- "PDZ1"
@@ -763,13 +763,16 @@ colData (maternal_stroma.sce)$stromatype <- as.character            (maternal_st
          maternal_stroma.sce                  <- slingshot               (maternal_stroma.sce,
                                                                        clusterLabels = 'stromatype',
                                                                        reducedDim    = 'UMAP',
-                                                                       start.clus    = 'udStr',
+                                                                       start.clus    = 'unStr',
                                                                        end.clus      = c('PDZ2', 'SDZ2'),
                                                                        stretch       = 0,
                                                                        extend        = 'n',
                                                                        omega         = TRUE)
 
 ```
+
+
+#Figure 5.6A
 ```{r}
 colors   <- colorRampPalette (brewer.pal (11, 'Spectral') [-6]) (100)
 plotcol1 <- colors [cut (slingPseudotime (maternal_stroma.sce, na = FALSE) [ , 1], breaks = 100) ]
@@ -783,8 +786,10 @@ summary (maternal_stroma.sce$slingPseudotime_1)
 summary (maternal_stroma.sce$slingPseudotime_2)
 ```
 
+
+
 ```{r}
-maternal_stroma_pdz <- subset(x = maternal_stroma ,subset = stromatype == c("udStr","PDZ1","PDZ2"))
+maternal_stroma_pdz <- subset(x = maternal_stroma ,subset = stromatype == c("unStr","PDZ1","PDZ2"))
 Idents(maternal_stroma_pdz) <- "stromatype"
 
 ```
@@ -795,12 +800,11 @@ Idents(maternal_stroma_pdz) <- "stromatype"
 colData (maternal_stroma_pdz.sce)$stromatype <- as.character            (maternal_stroma_pdz@active.ident) # from factor to character                 
 ```
 
-
 ```{r}
          maternal_stroma_pdz.sce                  <- slingshot               (maternal_stroma_pdz.sce,
                                                                        clusterLabels = 'stromatype',
                                                                        reducedDim    = 'UMAP',
-                                                                       start.clus    = 'udStr',
+                                                                       start.clus    = 'unStr',
                                                                        end.clus      = c('PDZ2'),
                                                                        stretch       = 0,
                                                                        extend        = 'n',
@@ -808,8 +812,9 @@ colData (maternal_stroma_pdz.sce)$stromatype <- as.character            (materna
 ```
 
 
+
 ```{r}
-maternal_stroma_sdz <- subset(x = maternal_stroma ,subset = stromatype == c("udStr","SDZ1","SDZ2"))
+maternal_stroma_sdz <- subset(x = maternal_stroma ,subset = stromatype == c("unStr","SDZ1","SDZ2"))
 Idents(maternal_stroma_sdz) <- "stromatype"
 
 ```
@@ -824,14 +829,14 @@ colData (maternal_stroma_sdz.sce)$stromatype <- as.character            (materna
          maternal_stroma_sdz.sce                  <- slingshot               (maternal_stroma_sdz.sce,
                                                                        clusterLabels = 'stromatype',
                                                                        reducedDim    = 'UMAP',
-                                                                       start.clus    = 'udStr',
+                                                                       start.clus    = 'unStr',
                                                                        end.clus      = c('SDZ2'),
                                                                        stretch       = 0,
                                                                        extend        = 'n',
                                                                        omega         = TRUE)
 ```
 
-#Figure 4D 
+#Figure 5.6C
 ```{r}
 pt_df_pdz <- data.frame(
   pseudotime = slingPseudotime(maternal_stroma_pdz.sce)[,1],
@@ -929,7 +934,7 @@ combined_plot <- swarm_plot / density_plot + plot_layout(heights = c(2, 1))
 combined_plot
 ```
 
-#Figure 4D Statistical Analysis - Kolmogorov-Smirnov Test 
+#Figure 5.6C Statistical Analysis - Kolmogorov-Smirnov Test 
 ```{r}
 
 ks.test(slingPseudotime(maternal_stroma_pdz.sce)[colData(maternal_stroma_pdz.sce)$Condition == "Maternal Chow", 1],
@@ -939,7 +944,7 @@ ks.test(slingPseudotime(maternal_stroma_sdz.sce)[colData(maternal_stroma_sdz.sce
         slingPseudotime(maternal_stroma_sdz.sce)[colData(maternal_stroma_sdz.sce)$Condition == "Maternal HFHS", 1])
 ```
 
-#Figure S4E - Slingshot pseudotime / UMAP
+#Figure 5.6A and 5.6B - Slingshot pseudotime / UMAP
 
 ```{r}
 colors   <- colorRampPalette (brewer.pal (11, 'Spectral') [-6]) (100)
@@ -954,6 +959,41 @@ lgd <- matrix      (colors)
 
 plot  (reducedDims      (maternal_stroma.sce)$UMAP,  col = plotcol2, pch  = 16,       asp = 1)                       
 lines (SlingshotDataSet (maternal_stroma.sce),       lwd = 2,       type = 'lineage', col = 'black', show.constraints = TRUE)
+lgd <- matrix      (colors)
+
+```
+
+```{r}
+colors   <- colorRampPalette (brewer.pal (11, 'Spectral') [-6]) (100)
+plotcol1 <- colors [cut (slingPseudotime (maternal_stroma_pdz.sce, na = FALSE) [ , 1], breaks = 100) ]
+plotcol2 <- colors [cut (slingPseudotime (maternal_stroma_pdz.sce, na = FALSE) [ , 2], breaks = 100) ]
+plot  (reducedDims      (maternal_stroma_pdz.sce)$UMAP,  col = plotcol1, pch  = 16,       asp = 1)         
+
+
+plot  (reducedDims      (maternal_stroma_pdz.sce)$UMAP, col = plotcol1, pch  = 16,        asp = 1)                       
+lines (SlingshotDataSet (maternal_stroma_pdz.sce),      lwd = 2,        type = 'lineage', col = 'black', show.constraints = TRUE)
+lgd <- matrix      (colors)
+
+plot  (reducedDims      (maternal_stroma_pdz.sce)$UMAP,  col = plotcol2, pch  = 16,       asp = 1)                       
+lines (SlingshotDataSet (maternal_stroma_pdz.sce),       lwd = 2,       type = 'lineage', col = 'black', show.constraints = TRUE)
+lgd <- matrix      (colors)
+
+```
+
+
+```{r}
+colors   <- colorRampPalette (brewer.pal (11, 'Spectral') [-6]) (100)
+plotcol1 <- colors [cut (slingPseudotime (maternal_stroma_sdz.sce, na = FALSE) [ , 1], breaks = 100) ]
+plotcol2 <- colors [cut (slingPseudotime (maternal_stroma_sdz.sce, na = FALSE) [ , 2], breaks = 100) ]
+plot  (reducedDims      (maternal_stroma_sdz.sce)$UMAP,  col = plotcol1, pch  = 16,       asp = 1)         
+
+
+plot  (reducedDims      (maternal_stroma_sdz.sce)$UMAP, col = plotcol1, pch  = 16,        asp = 1)                       
+lines (SlingshotDataSet (maternal_stroma_sdz.sce),      lwd = 2,        type = 'lineage', col = 'black', show.constraints = TRUE)
+lgd <- matrix      (colors)
+
+plot  (reducedDims      (maternal_stroma_sdz.sce)$UMAP,  col = plotcol2, pch  = 16,       asp = 1)                       
+lines (SlingshotDataSet (maternal_stroma_sdz.sce),       lwd = 2,       type = 'lineage', col = 'black', show.constraints = TRUE)
 lgd <- matrix      (colors)
 
 ```

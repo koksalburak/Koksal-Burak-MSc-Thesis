@@ -1422,7 +1422,7 @@ md[, .N, by = "Condition"]
 ```
 
 
-#Table 2: Finding the markers / Cluster annotation
+#Supplemental File 4.2: Finding the markers / Cluster annotation
 ```{r}
 DefaultAssay(maternal_integrated) <- "RNA"
 
@@ -1477,7 +1477,7 @@ maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_cluster
 maternal_integrated$celltype[which(str_detect(maternal_integrated$seurat_clusters, "16"))] <- "Meso"  
 ```
 
-#Figure1E Integrated
+#Figure4.2A Integrated
 ```{r}
 
 UMAPPlot     (object = maternal_integrated, label = F, pt.size = 3,
@@ -1499,7 +1499,7 @@ UMAPPlot     (object = maternal_integrated, label = F, pt.size = 3,
 "Meso" = '#882255' ))  + NoLegend ()
 ```
 
-#Figure1E Split Condition
+#Figure4.2A Split Condition
 ```{r}
 
 UMAPPlot     (object = maternal_integrated, label = F, pt.size = 3, split.by = 'Condition',
@@ -1522,7 +1522,7 @@ UMAPPlot     (object = maternal_integrated, label = F, pt.size = 3, split.by = '
 "Meso" = '#882255' ))  + NoLegend ()
 ```
 
-#FigureS1C
+#Figure4.2B
 ```{r}
 
 
@@ -1532,7 +1532,7 @@ VlnPlot(maternal_integrated,group.by = "orig.ident", features = c("nFeature_RNA"
 
 ```
 
-#FigureS1D
+#Figure4.2C
 ```{r}
 markers.to.plot <- c("Hoxa10","Hoxa11","Hand2","Prlr","Nog","Dio3","Rrm2","Ogn","Fibin","Clec3b","Spon2","Hist1h1a","Acta2","Myh11","Pecam1","Mcam","Flt1","Prox1","Mmrn1","Epcam","Foxa2","Calb1","Upk3b","Lrrn4","Ptprc","Cd3e","Cxcr6","Nkg7","Eomes","Zbtb46","Cd209a","Xcr1","Clec9a","Cx3cr1","Adgre1","Ms4a7")
 
@@ -1643,7 +1643,7 @@ grid.arrange(p1, p2, ncol = 2)
 
 ```
 
-#FigureS1E
+#Figure4.2D
 ```{r}
 
 grid.arrange(p1, p2, ncol = 2)
@@ -1659,7 +1659,7 @@ maternal_majorsub <- subset(x = maternal_integrated, idents = c("S1","S2","S3","
 
 ```
 
-#FigureS1F
+#Figure4.2E
 ```{r}
 cluster_var <- 'majorcelltype'
 clusters <- unique(maternal_majorsub@meta.data[[cluster_var]])
